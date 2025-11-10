@@ -81,7 +81,7 @@ class SharedViewModel : ViewModel() {
         return remaining.coerceAtLeast(0)
     }
 
-    // Steps - Simulated tracking for now
+    // Steps - Supports both live and simulated tracking
     data class StepData(
         val date: String, // "2024-01-15" format
         val steps: Int,
@@ -91,11 +91,31 @@ class SharedViewModel : ViewModel() {
     private val _dailyStepGoal = MutableStateFlow(10000) // Default goal
     val dailyStepGoal: StateFlow<Int> = _dailyStepGoal
 
-    private val _todaySteps = MutableStateFlow(0) // Simulated step count
+    private val _todaySteps = MutableStateFlow(0)
     val todaySteps: StateFlow<Int> = _todaySteps
 
     private val _stepHistory = MutableStateFlow<List<StepData>>(emptyList())
     val stepHistory: StateFlow<List<StepData>> = _stepHistory
+
+    // Track if we're using live tracking or simulation
+    private val _isLiveTracking = MutableStateFlow(false)
+    val isLiveTracking: StateFlow<Boolean> = _isLiveTracking
+
+    // Track if device has step sensor
+    private val _hasStepSensor = MutableStateFlow(false)
+    val hasStepSensor: StateFlow<Boolean> = _hasStepSensor
+
+    // Set whether device has step sensor available
+    fun setStepSensorAvailable(available: Boolean) {
+        _hasStepSensor.value = available
+    }
+
+    // Update steps from live sensor
+    fun updateLiveSteps(steps: Int) {
+        _isLiveTracking.value = true
+        _todaySteps.value = steps
+        saveTodaySteps()
+    }
 
     // Set daily step goal
     fun setDailyStepGoal(goal: Int) {
@@ -105,12 +125,19 @@ class SharedViewModel : ViewModel() {
         }
     }
 
-    // Simulate step updates (in real app, this would come from sensor)
+    // Simulate step updates (fallback when sensor not available)
     fun simulateStepUpdate() {
-        // Add random steps to simulate walking
-        val randomSteps = (50..200).random()
-        _todaySteps.value += randomSteps
-        saveTodaySteps()
+        if (!_isLiveTracking.value) {
+            // Add random steps to simulate walking
+            val randomSteps = (50..200).random()
+            _todaySteps.value += randomSteps
+            saveTodaySteps()
+        } else {
+            // If live tracking is active, add smaller increments for testing
+            val randomSteps = (10..50).random()
+            _todaySteps.value += randomSteps
+            saveTodaySteps()
+        }
     }
 
     // Save today's steps to history
@@ -163,12 +190,22 @@ class SharedViewModel : ViewModel() {
     // Reset today's steps (for testing/midnight reset)
     fun resetTodaySteps() {
         _todaySteps.value = 0
+        _isLiveTracking.value = false
         saveTodaySteps()
     }
 
-    // Check if step tracking is available (simulated for now)
+    // Check if step tracking is available (sensor or simulation)
     fun isStepTrackingAvailable(): Boolean {
-        return true // Simulated as available
+        return true // Always available (either live or simulated)
+    }
+
+    // Get tracking status message
+    fun getTrackingStatus(): String {
+        return when {
+            _isLiveTracking.value -> "📍 Live Tracking Active"
+            _hasStepSensor.value -> "📱 Sensor Ready (Not Tracking)"
+            else -> "📊 Simulation Mode"
+        }
     }
 
     // Workouts

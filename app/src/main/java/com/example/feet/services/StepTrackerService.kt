@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -15,6 +16,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.example.feet.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,7 +65,7 @@ class StepTrackerService : Service(), SensorEventListener {
         }
     }
 
-    override fun onSensorEvent(event: SensorEvent?) {
+    override fun onSensorChanged(event: SensorEvent?) {
         event?.let {
             when (event.sensor.type) {
                 Sensor.TYPE_STEP_COUNTER -> {
@@ -93,6 +95,7 @@ class StepTrackerService : Service(), SensorEventListener {
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         // Handle accuracy changes if needed
+        Log.d("StepTracker", "Sensor accuracy changed: $accuracy")
     }
 
     private fun startForegroundService() {
@@ -103,9 +106,20 @@ class StepTrackerService : Service(), SensorEventListener {
             .setContentText("Tracking your steps in real-time")
             .setSmallIcon(R.drawable.ic_launcher_foreground) // Use your app icon
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true) // Make notification persistent
             .build()
 
-        startForeground(1, notification)
+        // For Android 14+ (API 34+), we need to specify the service type
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ServiceCompat.startForeground(
+                this,
+                1,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+            )
+        } else {
+            startForeground(1, notification)
+        }
     }
 
     private fun createNotificationChannel() {
@@ -116,6 +130,7 @@ class StepTrackerService : Service(), SensorEventListener {
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Tracks your steps in the background"
+                setShowBadge(false)
             }
 
             val notificationManager = getSystemService(NotificationManager::class.java)
@@ -126,6 +141,7 @@ class StepTrackerService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
+        Log.d("StepTracker", "Service destroyed")
     }
 
     // Method to reset steps (call this at midnight)
@@ -134,6 +150,7 @@ class StepTrackerService : Service(), SensorEventListener {
             hasInitialValue = false
         }
         _stepCount.value = 0
+        Log.d("StepTracker", "Steps reset")
     }
 
     // Method to get current steps

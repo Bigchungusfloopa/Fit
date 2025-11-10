@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -25,17 +26,49 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.feet.services.StepTrackerService
 import com.example.feet.ui.GlassButton
 import com.example.feet.ui.screens.MainScreen
 import com.example.feet.ui.theme.FeetTheme
 import com.example.feet.ui.viewmodels.SharedViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel = SharedViewModel()
+    private var stepTrackerService: StepTrackerService? = null
+    private var isServiceBound = false
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as StepTrackerService.StepTrackerBinder
+            stepTrackerService = binder.getService()
+            isServiceBound = true
+
+            // Connect the service to the viewModel
+            lifecycleScope.launch {
+                stepTrackerService?.stepCount?.collect { steps ->
+                    viewModel.updateLiveSteps(steps)
+                }
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            stepTrackerService = null
+            isServiceBound = false
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Check if device has step sensors
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val hasStepSensor = sensorManager.getDefaultSensor(android.hardware.Sensor.TYPE_STEP_COUNTER) != null ||
+                sensorManager.getDefaultSensor(android.hardware.Sensor.TYPE_STEP_DETECTOR) != null
+
+        viewModel.setStepSensorAvailable(hasStepSensor)
 
         setContent {
             FeetTheme {
@@ -46,10 +79,9 @@ class MainActivity : ComponentActivity() {
                     ActivityResultContracts.RequestPermission()
                 ) { isGranted ->
                     hasStepPermission = isGranted
-                    if (isGranted) {
-                        // For now, we'll use simulated steps since step tracking service has issues
-                        // In a real app, you'd start the step tracking service here
-                    } else {
+                    if (isGranted && hasStepSensor) {
+                        startStepTrackerService()
+                    } else if (!isGranted) {
                         showPermissionRationale = true
                     }
                 }
@@ -70,15 +102,26 @@ class MainActivity : ComponentActivity() {
                                 permission
                             ) == PackageManager.PERMISSION_GRANTED -> {
                                 hasStepPermission = true
+                                if (hasStepSensor) {
+                                    startStepTrackerService()
+                                }
                             }
                             else -> {
-                                // Request permission
-                                permissionLauncher.launch(permission)
+                                // Request permission only if we have sensors
+                                if (hasStepSensor) {
+                                    permissionLauncher.launch(permission)
+                                } else {
+                                    // No sensors, skip permission
+                                    hasStepPermission = true
+                                }
                             }
                         }
                     } else {
                         // For Android < 10, no permission needed
                         hasStepPermission = true
+                        if (hasStepSensor) {
+                            startStepTrackerService()
+                        }
                     }
                 }
 
@@ -100,6 +143,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun startStepTrackerService() {
+        if (!isServiceBound) {
+            val serviceIntent = Intent(this, StepTrackerService::class.java)
+            startService(serviceIntent)
+            bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isServiceBound) {
+            unbindService(serviceConnection)
+            isServiceBound = false
+        }
+        // Optionally stop the service completely
+        // stopService(Intent(this, StepTrackerService::class.java))
     }
 }
 
