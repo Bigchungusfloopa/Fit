@@ -19,7 +19,7 @@ import com.example.feet.ui.GlassCard
 import com.example.feet.ui.viewmodels.SharedViewModel
 
 @Composable
-fun WorkoutScreen(viewModel: SharedViewModel) {
+fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
     val workouts by viewModel.todayWorkouts.collectAsState()
     val completedWorkouts = viewModel.getCompletedWorkoutsCount()
 

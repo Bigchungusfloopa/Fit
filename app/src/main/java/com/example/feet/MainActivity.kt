@@ -28,7 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.feet.services.StepTrackerService
-import com.example.feet.ui.GlassButton
+import com.example.feet.ui.components.LiquidGlassButton
+import com.example.feet.ui.components.ButtonVariant
 import com.example.feet.ui.screens.MainScreen
 import com.example.feet.ui.theme.FeetTheme
 import com.example.feet.ui.viewmodels.SharedViewModel
@@ -148,7 +149,11 @@ class MainActivity : ComponentActivity() {
     private fun startStepTrackerService() {
         if (!isServiceBound) {
             val serviceIntent = Intent(this, StepTrackerService::class.java)
-            startService(serviceIntent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
             bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
     }
@@ -202,10 +207,11 @@ fun PermissionRationaleScreen(onRequestPermission: () -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        GlassButton(
+        LiquidGlassButton(
             onClick = onRequestPermission,
             text = "Allow Step Tracking",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.PRIMARY
         )
 
         Spacer(modifier = Modifier.height(16.dp))

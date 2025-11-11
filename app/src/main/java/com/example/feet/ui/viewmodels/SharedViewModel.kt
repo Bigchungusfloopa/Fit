@@ -11,16 +11,31 @@ import java.time.format.DateTimeFormatter
 
 class SharedViewModel : ViewModel() {
 
-    // Water settings
-    private val dailyGoalMl = 4000 // 4 liters
+    // Data class to hold historical water data
+    data class WaterData(
+        val date: String, // "YYYY-MM-DD" format
+        val totalMl: Int
+    )
+
+    // --- UPDATED GOAL ---
+    // Changed from 'private val dailyGoalMl = 4000'
+    private val _dailyGoalMl = MutableStateFlow(4000) // 4 liters
+    val dailyGoalMl: StateFlow<Int> = _dailyGoalMl
+    // --- END UPDATE ---
+
     var glassSizeMl by mutableStateOf(250f) // Default glass size, can be customized
 
     private val _todayWater = MutableStateFlow(0)
     val todayWater: StateFlow<Int> = _todayWater
 
+    // StateFlow to hold the list of past water data
+    private val _waterHistory = MutableStateFlow<List<WaterData>>(emptyList())
+    val waterHistory: StateFlow<List<WaterData>> = _waterHistory
+
     // Add one glass with current glass size
     fun addGlass() {
         _todayWater.value += glassSizeMl.toInt()
+        saveTodayWater()
     }
 
     // Remove one glass with current glass size - PREVENT NEGATIVE
@@ -29,10 +44,33 @@ class SharedViewModel : ViewModel() {
         val glassSize = glassSizeMl.toInt()
         if (currentMl >= glassSize) {
             _todayWater.value -= glassSize
+            saveTodayWater()
         }
         // If current water is less than glass size but greater than 0, set to 0
         else if (currentMl > 0) {
             _todayWater.value = 0
+            saveTodayWater()
+        }
+    }
+
+    // Private function to save today's water to history
+    private fun saveTodayWater() {
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
+        val existingIndex = _waterHistory.value.indexOfFirst { it.date == today }
+
+        val newWaterData = WaterData(
+            date = today,
+            totalMl = _todayWater.value
+        )
+
+        if (existingIndex >= 0) {
+            // Update existing entry
+            val updatedHistory = _waterHistory.value.toMutableList()
+            updatedHistory[existingIndex] = newWaterData
+            _waterHistory.value = updatedHistory
+        } else {
+            // Add new entry
+            _waterHistory.value = _waterHistory.value + newWaterData
         }
     }
 
@@ -40,6 +78,16 @@ class SharedViewModel : ViewModel() {
     fun setGlassSize(sizeMl: Float) {
         glassSizeMl = sizeMl
     }
+
+    // --- NEW FUNCTION ---
+    // Set daily goal from Liters
+    fun setDailyGoal(goalLiters: Float) {
+        if (goalLiters > 0) {
+            _dailyGoalMl.value = (goalLiters * 1000).toInt()
+        }
+    }
+    // --- END NEW FUNCTION ---
+
 
     // Get current glass size in ml
     fun getGlassSize(): Float = glassSizeMl
@@ -57,7 +105,9 @@ class SharedViewModel : ViewModel() {
     // Get number of glasses needed to reach goal
     fun getGlassesGoal(): Int {
         return if (glassSizeMl > 0) {
-            (dailyGoalMl / glassSizeMl).toInt()
+            // --- UPDATED ---
+            (_dailyGoalMl.value / glassSizeMl).toInt()
+            // --- END UPDATE ---
         } else {
             16 // Default fallback
         }
@@ -65,7 +115,10 @@ class SharedViewModel : ViewModel() {
 
     // Get water progress (0.0 to 1.0) - PREVENT NEGATIVE
     fun getWaterProgress(): Float {
-        val progress = (_todayWater.value.toFloat() / dailyGoalMl)
+        // --- UPDATED ---
+        if (_dailyGoalMl.value == 0) return 0f
+        val progress = (_todayWater.value.toFloat() / _dailyGoalMl.value)
+        // --- END UPDATE ---
         return progress.coerceIn(0f, 1f) // Ensure between 0 and 1
     }
 
@@ -77,7 +130,9 @@ class SharedViewModel : ViewModel() {
 
     // Get remaining water in ml - PREVENT NEGATIVE
     fun getRemainingWaterMl(): Int {
-        val remaining = dailyGoalMl - _todayWater.value
+        // --- UPDATED ---
+        val remaining = _dailyGoalMl.value - _todayWater.value
+        // --- END UPDATE ---
         return remaining.coerceAtLeast(0)
     }
 

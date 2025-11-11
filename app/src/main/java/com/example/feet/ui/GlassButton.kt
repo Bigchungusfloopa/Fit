@@ -34,7 +34,7 @@ fun GlassButton(
         interactionSource = interactionSource,
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(
+        border = BorderStroke( // Keep the white border for contrast
             width = 1.dp,
             brush = Brush.linearGradient(
                 colors = listOf(
@@ -44,9 +44,11 @@ fun GlassButton(
             )
         ),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White.copy(alpha = buttonAlpha),
-            contentColor = Color.White,
-            disabledContainerColor = Color.White.copy(alpha = 0.1f),
+            // --- CHANGE HERE ---
+            containerColor = Color.Black.copy(alpha = buttonAlpha), // Blackish container
+            contentColor = Color.White.copy(alpha = 0.9f), // Toned-down text
+            disabledContainerColor = Color.Black.copy(alpha = 0.1f), // Darker disabled
+            // --- END CHANGE ---
             disabledContentColor = Color.White.copy(alpha = 0.5f)
         ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
