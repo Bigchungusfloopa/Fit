@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels // <-- IMPORT ADDED
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider // <-- IMPORT ADDED
 import androidx.lifecycle.lifecycleScope
 import com.example.feet.services.StepTrackerService
 import com.example.feet.ui.components.LiquidGlassButton
@@ -37,7 +39,12 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel = SharedViewModel()
+    // --- THIS LINE IS THE FIX ---
+    private val viewModel: SharedViewModel by viewModels {
+        ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+    }
+    // --- END OF FIX ---
+
     private var stepTrackerService: StepTrackerService? = null
     private var isServiceBound = false
 

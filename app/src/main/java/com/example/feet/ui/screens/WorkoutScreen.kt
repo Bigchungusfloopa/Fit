@@ -1,27 +1,44 @@
 package com.example.feet.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.feet.ui.GlassButton
-import com.example.feet.ui.GlassCard
+import androidx.compose.ui.window.Dialog
+import com.example.feet.ui.components.ButtonSize
+import com.example.feet.ui.components.ButtonVariant
+import com.example.feet.ui.components.LiquidGlassButton
+import com.example.feet.ui.components.TranslucentBox
 import com.example.feet.ui.viewmodels.SharedViewModel
 
 @Composable
 fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
     val workouts by viewModel.todayWorkouts.collectAsState()
     val completedWorkouts = viewModel.getCompletedWorkoutsCount()
+
+    // --- NEW MEDIA STATE ---
+    val currentTrack by viewModel.currentTrack.collectAsState()
+    val currentArtist by viewModel.currentArtist.collectAsState()
+    var hasNotificationPermission by remember { mutableStateOf(viewModel.isNotificationListenerEnabled()) }
+    // --- END NEW STATE ---
 
     var showAddWorkoutDialog by remember { mutableStateOf(false) }
     var workoutName by remember { mutableStateOf("") }
@@ -37,33 +54,48 @@ fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
     ) {
         Text(
             text = "Workouts",
-            style = androidx.compose.material3.MaterialTheme.typography.headlineLarge,
-            color = Color.White,
+            style = MaterialTheme.typography.headlineLarge,
+            color = Color.White.copy(alpha = 0.9f),
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)
         )
 
-        // Simplified Summary - Only Completed Workouts
-        GlassCard(
+        // Battery-style Progress Bar
+        TranslucentBox(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
+                .height(120.dp)
         ) {
-            Box(
+            Column(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "$completedWorkouts Workouts Completed Today",
-                    style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    text = "Today's Progress",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                WorkoutBatteryIndicator(
+                    completedWorkouts = completedWorkouts,
+                    totalWorkouts = workouts.size
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "$completedWorkouts of ${workouts.size} workouts completed",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
             }
         }
 
         // Add Workout Button
-        GlassButton(
+        LiquidGlassButton(
             onClick = {
                 workoutName = ""
                 workoutDuration = ""
@@ -71,20 +103,21 @@ fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
                 selectedGoalType = SharedViewModel.GoalType.REPS
                 showAddWorkoutDialog = true
             },
-            text = "➕ Add Custom Workout",
-            modifier = Modifier.fillMaxWidth()
+            text = "Add Custom Workout",
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.PRIMARY
         )
 
         // Workout List
         Text(
             text = "Today's Workouts",
-            style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
-            color = Color.White,
+            style = MaterialTheme.typography.headlineSmall,
+            color = Color.White.copy(alpha = 0.9f),
             modifier = Modifier.padding(start = 8.dp)
         )
 
         if (workouts.isEmpty()) {
-            GlassCard(
+            TranslucentBox(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
@@ -95,30 +128,47 @@ fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
                 ) {
                     Text(
                         text = "No workouts today\nAdd your first custom workout!",
-                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.8f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(workouts) { workout ->
-                    WorkoutItem(
-                        workout = workout,
-                        onToggleComplete = {
-                            viewModel.toggleWorkout(workout.id)
-                        },
-                        onDelete = {
-                            viewModel.deleteWorkout(workout.id)
-                        }
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
         }
+
+        // Use weight modifier if list is not empty
+        LazyColumn(
+            modifier = Modifier.weight(if (workouts.isEmpty()) 1f else 1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(workouts) { workout ->
+                WorkoutItem(
+                    workout = workout,
+                    onToggleComplete = {
+                        viewModel.toggleWorkout(workout.id)
+                    },
+                    onDelete = {
+                        viewModel.deleteWorkout(workout.id)
+                    }
+                )
+            }
+        }
+
+        // Add a spacer to push it to the bottom if the list is empty
+        if (workouts.isEmpty()) {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        // --- NOW PLAYING CARD ---
+        NowPlayingCard(
+            artist = currentArtist,
+            track = currentTrack,
+            hasPermission = hasNotificationPermission,
+            onRequestPermission = {
+                viewModel.requestNotificationPermission()
+            }
+        )
+        // --- END NOW PLAYING CARD ---
 
         // Add Custom Workout Dialog
         if (showAddWorkoutDialog) {
@@ -135,7 +185,6 @@ fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
                     val duration = workoutDuration.toIntOrNull()
                     val goalValue = workoutGoalValue.toIntOrNull() ?: 0
 
-                    // Only require name and goal value (duration is optional)
                     if (workoutName.isNotBlank() && goalValue > 0) {
                         viewModel.addCustomWorkout(workoutName, duration, goalValue, selectedGoalType)
                         showAddWorkoutDialog = false
@@ -148,16 +197,154 @@ fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
 }
 
 @Composable
+fun NowPlayingCard(
+    artist: String?,
+    track: String?,
+    hasPermission: Boolean,
+    onRequestPermission: () -> Unit
+) {
+    TranslucentBox(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+    ) {
+        if (!hasPermission) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Enable notification access to see music",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LiquidGlassButton(
+                    onClick = onRequestPermission,
+                    text = "Enable",
+                    size = ButtonSize.SMALL,
+                    variant = ButtonVariant.PRIMARY
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Now Playing",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (!track.isNullOrBlank()) track else "No music playing",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                if (!artist.isNullOrBlank()) {
+                    Text(
+                        text = artist,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkoutBatteryIndicator(
+    completedWorkouts: Int,
+    totalWorkouts: Int
+) {
+    val progress = if (totalWorkouts > 0) {
+        completedWorkouts.toFloat() / totalWorkouts.toFloat()
+    } else {
+        0f
+    }
+
+    // Animate the progress
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 800, easing = EaseOutCubic),
+        label = "progress_animation"
+    )
+
+    // Progress bar color based on completion
+    val progressColor = when {
+        progress >= 1f -> Color(0xFF00E676) // Bright green when complete
+        progress >= 0.5f -> Color(0xFF69F0AE) // Light green
+        progress >= 0.25f -> Color(0xFFFFD54F) // Yellow
+        else -> Color.White.copy(alpha = 0.3f) // Dim white
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Rounded rectangle progress bar
+        Box(
+            modifier = Modifier
+                .width(250.dp)
+                .height(50.dp)
+                .clip(RoundedCornerShape(25.dp))
+                .background(Color.Black.copy(alpha = 0.3f))
+                .border(
+                    width = 2.dp,
+                    color = Color.White.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(25.dp)
+                )
+        ) {
+            // Filled portion with animation
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(animatedProgress)
+                    .clip(RoundedCornerShape(25.dp))
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            colors = listOf(
+                                progressColor.copy(alpha = 0.6f),
+                                progressColor
+                            )
+                        )
+                    )
+            )
+
+            // Percentage text overlay
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun WorkoutItem(
     workout: SharedViewModel.Workout,
     onToggleComplete: () -> Unit,
     onDelete: () -> Unit
 ) {
-    GlassCard(
+    TranslucentBox(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             // Header row with name and delete button
             Row(
@@ -167,17 +354,18 @@ fun WorkoutItem(
             ) {
                 Text(
                     text = workout.name,
-                    style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White.copy(alpha = 0.9f),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
 
                 // Delete button
-                GlassButton(
+                LiquidGlassButton(
                     onClick = onDelete,
-                    text = "🗑️",
-                    modifier = Modifier.width(60.dp)
+                    text = "Delete",
+                    size = ButtonSize.SMALL,
+                    variant = ButtonVariant.SECONDARY
                 )
             }
 
@@ -196,39 +384,19 @@ fun WorkoutItem(
                 } else {
                     goalText
                 },
-                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.8f)
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.7f)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Complete/Undo button
-            if (workout.completed) {
-                // Show both Undo and Delete buttons for completed workouts
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    GlassButton(
-                        onClick = onToggleComplete,
-                        text = "↶ Undo",
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    GlassButton(
-                        onClick = onDelete,
-                        text = "🗑️ Delete",
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                // Show only Complete button for incomplete workouts
-                GlassButton(
-                    onClick = onToggleComplete,
-                    text = "Mark as Complete",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            LiquidGlassButton(
+                onClick = onToggleComplete,
+                text = if (workout.completed) "Undo" else "Mark as Complete",
+                modifier = Modifier.fillMaxWidth(),
+                variant = if (workout.completed) ButtonVariant.SECONDARY else ButtonVariant.PRIMARY
+            )
         }
     }
 }
@@ -246,13 +414,18 @@ fun AddWorkoutDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    androidx.compose.ui.window.Dialog(
+    Dialog(
         onDismissRequest = onDismiss
     ) {
-        GlassCard(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.Black.copy(alpha = 0.6f))
+                .border(
+                    width = 1.dp,
+                    color = Color.White.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(20.dp)
+                )
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -261,71 +434,65 @@ fun AddWorkoutDialog(
             ) {
                 Text(
                     text = "Add Custom Workout",
-                    style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White.copy(alpha = 0.9f),
                     fontWeight = FontWeight.Bold
                 )
 
-                // Workout Name
-                androidx.compose.material3.TextField(
+                TextField(
                     value = name,
                     onValueChange = onNameChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            "Workout name (e.g., Running, Push-ups)",
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    },
-                    label = { Text("Workout Name", color = Color.White) },
-                    colors = androidx.compose.material3.TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.6f),
-                        unfocusedIndicatorColor = Color.White.copy(alpha = 0.3f),
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
-                    )
+                    label = { Text("Workout Name") },
+                    placeholder = { Text("e.g., Running, Push-ups") },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        focusedTextColor = Color.White.copy(alpha = 0.9f),
+                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
+                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = Color.White.copy(alpha = 0.9f)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true
                 )
 
-                // Duration (Optional)
-                androidx.compose.material3.TextField(
+                TextField(
                     value = duration,
                     onValueChange = onDurationChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            "Duration in minutes (optional)",
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    },
-                    label = { Text("Duration (Optional)", color = Color.White) },
-                    colors = androidx.compose.material3.TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.6f),
-                        unfocusedIndicatorColor = Color.White.copy(alpha = 0.3f),
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
+                    label = { Text("Duration (Optional)") },
+                    placeholder = { Text("Duration in minutes") },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        focusedTextColor = Color.White.copy(alpha = 0.9f),
+                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
+                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = Color.White.copy(alpha = 0.9f)
                     ),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default.copy(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                    )
+                    shape = RoundedCornerShape(8.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    singleLine = true
                 )
 
                 // Goal Type Selection
                 Text(
                     text = "Goal Type",
-                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier.align(Alignment.Start)
                 )
 
@@ -334,127 +501,60 @@ fun AddWorkoutDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Reps Button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .background(
-                                color = if (goalType == SharedViewModel.GoalType.REPS)
-                                    Color.White.copy(alpha = 0.3f)
-                                else
-                                    Color.White.copy(alpha = 0.1f),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (goalType == SharedViewModel.GoalType.REPS)
-                                    Color.White.copy(alpha = 0.6f)
-                                else
-                                    Color.White.copy(alpha = 0.3f),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                            )
-                            .clickable { onGoalTypeChange(SharedViewModel.GoalType.REPS) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Repetitions",
-                            color = if (goalType == SharedViewModel.GoalType.REPS)
-                                Color.White
-                            else
-                                Color.White.copy(alpha = 0.7f),
-                            fontWeight = if (goalType == SharedViewModel.GoalType.REPS)
-                                FontWeight.Bold
-                            else
-                                FontWeight.Normal
-                        )
-                    }
+                    LiquidGlassButton(
+                        onClick = { onGoalTypeChange(SharedViewModel.GoalType.REPS) },
+                        text = "Repetitions",
+                        modifier = Modifier.weight(1f),
+                        variant = if (goalType == SharedViewModel.GoalType.REPS) ButtonVariant.PRIMARY else ButtonVariant.SECONDARY
+                    )
 
                     // Distance Button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .background(
-                                color = if (goalType == SharedViewModel.GoalType.KM)
-                                    Color.White.copy(alpha = 0.3f)
-                                else
-                                    Color.White.copy(alpha = 0.1f),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (goalType == SharedViewModel.GoalType.KM)
-                                    Color.White.copy(alpha = 0.6f)
-                                else
-                                    Color.White.copy(alpha = 0.3f),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                            )
-                            .clickable { onGoalTypeChange(SharedViewModel.GoalType.KM) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Distance (km)",
-                            color = if (goalType == SharedViewModel.GoalType.KM)
-                                Color.White
-                            else
-                                Color.White.copy(alpha = 0.7f),
-                            fontWeight = if (goalType == SharedViewModel.GoalType.KM)
-                                FontWeight.Bold
-                            else
-                                FontWeight.Normal
-                        )
-                    }
+                    LiquidGlassButton(
+                        onClick = { onGoalTypeChange(SharedViewModel.GoalType.KM) },
+                        text = "Distance (km)",
+                        modifier = Modifier.weight(1f),
+                        variant = if (goalType == SharedViewModel.GoalType.KM) ButtonVariant.PRIMARY else ButtonVariant.SECONDARY
+                    )
                 }
 
-                // Goal Value
-                androidx.compose.material3.TextField(
+                TextField(
                     value = goalValue,
                     onValueChange = onGoalValueChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            when (goalType) {
-                                SharedViewModel.GoalType.REPS -> "Number of repetitions"
-                                SharedViewModel.GoalType.KM -> "Distance in kilometers"
-                            },
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    },
                     label = {
                         Text(
                             when (goalType) {
                                 SharedViewModel.GoalType.REPS -> "Repetitions"
                                 SharedViewModel.GoalType.KM -> "Distance (km)"
-                            },
-                            color = Color.White
+                            }
                         )
                     },
-                    colors = androidx.compose.material3.TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.6f),
-                        unfocusedIndicatorColor = Color.White.copy(alpha = 0.3f),
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
-                    ),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default.copy(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                    )
-                )
-
-                // Quick preset examples
-                Text(
-                    text = when (goalType) {
-                        SharedViewModel.GoalType.REPS -> "Examples: Push-ups (50 reps), Squats (100 reps)"
-                        SharedViewModel.GoalType.KM -> "Examples: Running (5 km), Cycling (10 km)"
+                    placeholder = {
+                        Text(
+                            when (goalType) {
+                                SharedViewModel.GoalType.REPS -> "e.g., 50"
+                                SharedViewModel.GoalType.KM -> "e.g., 5"
+                            }
+                        )
                     },
-                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                        focusedTextColor = Color.White.copy(alpha = 0.9f),
+                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
+                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                        focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = Color.White.copy(alpha = 0.9f)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    singleLine = true
                 )
 
                 // Action buttons
@@ -462,17 +562,19 @@ fun AddWorkoutDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    GlassButton(
+                    LiquidGlassButton(
                         onClick = onDismiss,
                         text = "Cancel",
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        variant = ButtonVariant.SECONDARY
                     )
 
-                    GlassButton(
+                    LiquidGlassButton(
                         onClick = onConfirm,
                         text = "Add Workout",
                         modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank() && goalValue.toIntOrNull()?.let { it > 0 } == true
+                        enabled = name.isNotBlank() && goalValue.toIntOrNull()?.let { it > 0 } == true,
+                        variant = ButtonVariant.PRIMARY
                     )
                 }
             }

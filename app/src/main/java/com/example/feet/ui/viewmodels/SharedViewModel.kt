@@ -1,15 +1,25 @@
 package com.example.feet.ui.viewmodels
 
+import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.example.feet.services.MediaNotificationListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-class SharedViewModel : ViewModel() {
+// --- IMPORTANT: Change from ViewModel to AndroidViewModel ---
+class SharedViewModel(application: Application) : AndroidViewModel(application) {
 
     // Data class to hold historical water data
     data class WaterData(
@@ -17,28 +27,76 @@ class SharedViewModel : ViewModel() {
         val totalMl: Int
     )
 
-    // --- UPDATED GOAL ---
-    // Changed from 'private val dailyGoalMl = 4000'
     private val _dailyGoalMl = MutableStateFlow(4000) // 4 liters
     val dailyGoalMl: StateFlow<Int> = _dailyGoalMl
-    // --- END UPDATE ---
 
-    var glassSizeMl by mutableStateOf(250f) // Default glass size, can be customized
+    var glassSizeMl by mutableStateOf(250f)
 
     private val _todayWater = MutableStateFlow(0)
     val todayWater: StateFlow<Int> = _todayWater
 
-    // StateFlow to hold the list of past water data
     private val _waterHistory = MutableStateFlow<List<WaterData>>(emptyList())
     val waterHistory: StateFlow<List<WaterData>> = _waterHistory
 
-    // Add one glass with current glass size
+    // --- NEW MEDIA TRACKING ---
+    private val _currentTrack = MutableStateFlow<String?>(null)
+    val currentTrack: StateFlow<String?> = _currentTrack
+
+    private val _currentArtist = MutableStateFlow<String?>(null)
+    val currentArtist: StateFlow<String?> = _currentArtist
+
+    private val mediaUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == MediaNotificationListener.ACTION_MEDIA_UPDATE) {
+                _currentTrack.value = intent.getStringExtra(MediaNotificationListener.EXTRA_TRACK)
+                _currentArtist.value = intent.getStringExtra(MediaNotificationListener.EXTRA_ARTIST)
+            }
+        }
+    }
+
+    init {
+        // Register the receiver
+        LocalBroadcastManager.getInstance(application).registerReceiver(
+            mediaUpdateReceiver,
+            IntentFilter(MediaNotificationListener.ACTION_MEDIA_UPDATE)
+        )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Unregister the receiver
+        LocalBroadcastManager.getInstance(getApplication()).unregisterReceiver(mediaUpdateReceiver)
+    }
+
+    // --- NEW PERMISSION FUNCTIONS ---
+    fun isNotificationListenerEnabled(): Boolean {
+        val context = getApplication<Application>()
+        val enabledListeners = android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            "enabled_notification_listeners"
+        )
+        val componentName = ComponentName(context, MediaNotificationListener::class.java).flattenToString()
+        return enabledListeners?.contains(componentName) == true
+    }
+
+    fun requestNotificationPermission() {
+        // This intent takes the user to the setting screen
+        val context = getApplication<Application>()
+        val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+    // --- END NEW FUNCTIONS ---
+
+    // ... (rest of your water, steps, and workout functions are unchanged) ...
+
+    // Add one glass
     fun addGlass() {
         _todayWater.value += glassSizeMl.toInt()
         saveTodayWater()
     }
 
-    // Remove one glass with current glass size - PREVENT NEGATIVE
+    // Remove one glass
     fun removeGlass() {
         val currentMl = _todayWater.value
         val glassSize = glassSizeMl.toInt()
@@ -46,14 +104,13 @@ class SharedViewModel : ViewModel() {
             _todayWater.value -= glassSize
             saveTodayWater()
         }
-        // If current water is less than glass size but greater than 0, set to 0
         else if (currentMl > 0) {
             _todayWater.value = 0
             saveTodayWater()
         }
     }
 
-    // Private function to save today's water to history
+    // Save today's water
     private fun saveTodayWater() {
         val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
         val existingIndex = _waterHistory.value.indexOfFirst { it.date == today }
@@ -64,12 +121,10 @@ class SharedViewModel : ViewModel() {
         )
 
         if (existingIndex >= 0) {
-            // Update existing entry
             val updatedHistory = _waterHistory.value.toMutableList()
             updatedHistory[existingIndex] = newWaterData
             _waterHistory.value = updatedHistory
         } else {
-            // Add new entry
             _waterHistory.value = _waterHistory.value + newWaterData
         }
     }
@@ -79,71 +134,63 @@ class SharedViewModel : ViewModel() {
         glassSizeMl = sizeMl
     }
 
-    // --- NEW FUNCTION ---
     // Set daily goal from Liters
     fun setDailyGoal(goalLiters: Float) {
         if (goalLiters > 0) {
             _dailyGoalMl.value = (goalLiters * 1000).toInt()
         }
     }
-    // --- END NEW FUNCTION ---
 
 
     // Get current glass size in ml
     fun getGlassSize(): Float = glassSizeMl
 
-    // Get number of glasses consumed - PREVENT NEGATIVE
+    // Get number of glasses consumed
     fun getGlassesConsumed(): Int {
         val glasses = if (glassSizeMl > 0) {
             (_todayWater.value / glassSizeMl).toInt()
         } else {
             0
         }
-        return glasses.coerceAtLeast(0) // Ensure non-negative
+        return glasses.coerceAtLeast(0)
     }
 
     // Get number of glasses needed to reach goal
     fun getGlassesGoal(): Int {
         return if (glassSizeMl > 0) {
-            // --- UPDATED ---
             (_dailyGoalMl.value / glassSizeMl).toInt()
-            // --- END UPDATE ---
         } else {
-            16 // Default fallback
+            16
         }
     }
 
-    // Get water progress (0.0 to 1.0) - PREVENT NEGATIVE
+    // Get water progress
     fun getWaterProgress(): Float {
-        // --- UPDATED ---
         if (_dailyGoalMl.value == 0) return 0f
         val progress = (_todayWater.value.toFloat() / _dailyGoalMl.value)
-        // --- END UPDATE ---
-        return progress.coerceIn(0f, 1f) // Ensure between 0 and 1
+        return progress.coerceIn(0f, 1f)
     }
 
-    // Get remaining glasses to goal - PREVENT NEGATIVE
+    // Get remaining glasses
     fun getRemainingGlasses(): Int {
         val remaining = getGlassesGoal() - getGlassesConsumed()
         return remaining.coerceAtLeast(0)
     }
 
-    // Get remaining water in ml - PREVENT NEGATIVE
+    // Get remaining water in ml
     fun getRemainingWaterMl(): Int {
-        // --- UPDATED ---
         val remaining = _dailyGoalMl.value - _todayWater.value
-        // --- END UPDATE ---
         return remaining.coerceAtLeast(0)
     }
 
-    // Steps - Supports both live and simulated tracking
+    // Steps
     data class StepData(
-        val date: String, // "2024-01-15" format
+        val date: String,
         val steps: Int,
         val goal: Int
     )
 
-    private val _dailyStepGoal = MutableStateFlow(10000) // Default goal
+    private val _dailyStepGoal = MutableStateFlow(10000)
     val dailyStepGoal: StateFlow<Int> = _dailyStepGoal
 
     private val _todaySteps = MutableStateFlow(0)
@@ -152,50 +199,41 @@ class SharedViewModel : ViewModel() {
     private val _stepHistory = MutableStateFlow<List<StepData>>(emptyList())
     val stepHistory: StateFlow<List<StepData>> = _stepHistory
 
-    // Track if we're using live tracking or simulation
     private val _isLiveTracking = MutableStateFlow(false)
     val isLiveTracking: StateFlow<Boolean> = _isLiveTracking
 
-    // Track if device has step sensor
     private val _hasStepSensor = MutableStateFlow(false)
     val hasStepSensor: StateFlow<Boolean> = _hasStepSensor
 
-    // Set whether device has step sensor available
     fun setStepSensorAvailable(available: Boolean) {
         _hasStepSensor.value = available
     }
 
-    // Update steps from live sensor
     fun updateLiveSteps(steps: Int) {
         _isLiveTracking.value = true
         _todaySteps.value = steps
         saveTodaySteps()
     }
 
-    // Set daily step goal
     fun setDailyStepGoal(goal: Int) {
         if (goal > 0) {
             _dailyStepGoal.value = goal
-            saveTodaySteps() // Update history with new goal
+            saveTodaySteps()
         }
     }
 
-    // Simulate step updates (fallback when sensor not available)
     fun simulateStepUpdate() {
         if (!_isLiveTracking.value) {
-            // Add random steps to simulate walking
             val randomSteps = (50..200).random()
             _todaySteps.value += randomSteps
             saveTodaySteps()
         } else {
-            // If live tracking is active, add smaller increments for testing
             val randomSteps = (10..50).random()
             _todaySteps.value += randomSteps
             saveTodaySteps()
         }
     }
 
-    // Save today's steps to history
     private fun saveTodaySteps() {
         val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
         val existingIndex = _stepHistory.value.indexOfFirst { it.date == today }
@@ -207,17 +245,14 @@ class SharedViewModel : ViewModel() {
         )
 
         if (existingIndex >= 0) {
-            // Update existing entry
             val updatedHistory = _stepHistory.value.toMutableList()
             updatedHistory[existingIndex] = newStepData
             _stepHistory.value = updatedHistory
         } else {
-            // Add new entry
             _stepHistory.value = _stepHistory.value + newStepData
         }
     }
 
-    // Get steps progress (0.0 to 1.0)
     fun getStepsProgress(): Float {
         val goal = _dailyStepGoal.value
         return if (goal > 0) {
@@ -227,39 +262,37 @@ class SharedViewModel : ViewModel() {
         }
     }
 
-    // Get week history (last 7 days)
     fun getWeekHistory(): List<StepData> {
         return _stepHistory.value.takeLast(7).reversed()
     }
 
-    // Calculate calories from steps
+    fun getMonthHistory(): List<StepData> {
+        return _stepHistory.value.takeLast(30).reversed()
+    }
+
     fun calculateCalories(): Int {
         return (_todaySteps.value * 0.04).toInt()
     }
 
-    // Calculate distance from steps
     fun calculateDistance(): Float {
         return _todaySteps.value * 0.000762f
     }
 
-    // Reset today's steps (for testing/midnight reset)
     fun resetTodaySteps() {
         _todaySteps.value = 0
         _isLiveTracking.value = false
         saveTodaySteps()
     }
 
-    // Check if step tracking is available (sensor or simulation)
     fun isStepTrackingAvailable(): Boolean {
-        return true // Always available (either live or simulated)
+        return true
     }
 
-    // Get tracking status message
     fun getTrackingStatus(): String {
         return when {
-            _isLiveTracking.value -> "📍 Live Tracking Active"
-            _hasStepSensor.value -> "📱 Sensor Ready (Not Tracking)"
-            else -> "📊 Simulation Mode"
+            _isLiveTracking.value -> "Live Tracking"
+            _hasStepSensor.value -> "Sensor Ready"
+            else -> "Simulation Mode"
         }
     }
 
@@ -267,9 +300,9 @@ class SharedViewModel : ViewModel() {
     data class Workout(
         val id: Long,
         val name: String,
-        val duration: Int? = null, // in minutes (optional)
-        val goalValue: Int, // either reps or distance
-        val goalType: GoalType, // REPS or KM
+        val duration: Int? = null,
+        val goalValue: Int,
+        val goalType: GoalType,
         val completed: Boolean = false
     )
 
@@ -280,7 +313,6 @@ class SharedViewModel : ViewModel() {
     private val _todayWorkouts = MutableStateFlow<List<Workout>>(emptyList())
     val todayWorkouts: StateFlow<List<Workout>> = _todayWorkouts
 
-    // Add custom workout
     fun addCustomWorkout(name: String, duration: Int?, goalValue: Int, goalType: GoalType) {
         val newId = (_todayWorkouts.value.maxOfOrNull { it.id } ?: 0) + 1
         val newWorkout = Workout(
@@ -293,7 +325,6 @@ class SharedViewModel : ViewModel() {
         _todayWorkouts.value = _todayWorkouts.value + newWorkout
     }
 
-    // Delete workout
     fun deleteWorkout(workoutId: Long) {
         _todayWorkouts.value = _todayWorkouts.value.filter { it.id != workoutId }
     }

@@ -89,6 +89,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
 
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

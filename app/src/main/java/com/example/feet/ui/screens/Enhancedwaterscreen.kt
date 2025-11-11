@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,7 +40,7 @@ fun EnhancedWaterScreen(viewModel: SharedViewModel) {
     val progress = viewModel.getWaterProgress()
     val glassesConsumed = viewModel.getGlassesConsumed()
     val glassesGoal = viewModel.getGlassesGoal()
-    val glassSize = remember { viewModel.getGlassSize() }
+    val glassSize by remember { derivedStateOf { viewModel.getGlassSize() } }
     val waterHistory by viewModel.waterHistory.collectAsState()
 
     // --- NEW STATE ---
@@ -134,7 +135,7 @@ fun EnhancedWaterScreen(viewModel: SharedViewModel) {
                 text = "Add Glass",
                 variant = ButtonVariant.PRIMARY,
                 modifier = Modifier.weight(1f),
-                enabled = waterMl < dailyGoalMl // Changed from 4000
+                enabled = glassesConsumed < glassesGoal // Fixed: Check glasses count, not ml
             )
         }
 
@@ -458,63 +459,79 @@ fun LiquidWaterFill(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "water_fill")
+    // Animated progress fill
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 600, easing = EaseInOutCubic),
+        label = "water_progress"
+    )
 
+    // Wave animation
+    val infiniteTransition = rememberInfiniteTransition(label = "wave_animation")
     val waveOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
+            animation = tween(2500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "wave"
+        label = "wave_offset"
     )
 
     Canvas(modifier = modifier) {
-        val fillHeight = size.height * (1f - progress)
+        val fillHeight = size.height * (1f - animatedProgress)
 
+        // Create wave path - minimalistic wave
         val wavePath = Path().apply {
             moveTo(0f, fillHeight)
 
-            for (x in 0..size.width.toInt() step 10) {
-                val waveHeight = sin((x * 0.02f + waveOffset * 0.017f)) * 15f
-                lineTo(x.toFloat(), fillHeight + waveHeight)
+            // Create smooth wave with smaller amplitude
+            val waveLength = size.width / 2f
+            val amplitude = 8f // Subtle wave height
+
+            var x = 0f
+            while (x <= size.width) {
+                val angle = ((x / waveLength) * 360f + waveOffset) * (Math.PI / 180f).toFloat()
+                val y = fillHeight + sin(angle) * amplitude
+                lineTo(x, y)
+                x += 5f
             }
 
+            // Complete the path
             lineTo(size.width, size.height)
             lineTo(0f, size.height)
             close()
         }
 
-        // --- 3. GRAPH COLOR UPDATED TO WHITE ---
+        // Draw the water with gradient
         drawPath(
             path = wavePath,
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.5f),
-                    Color.White.copy(alpha = 0.3f)
+                    Color.White.copy(alpha = 0.15f),
+                    Color.White.copy(alpha = 0.25f),
+                    Color.White.copy(alpha = 0.35f)
                 ),
                 startY = fillHeight,
                 endY = size.height
             )
         )
 
-        // Add bubbles
-        for (i in 0..5) {
-            val bubbleY = fillHeight + (size.height - fillHeight) * (i / 5f)
-            val bubbleX = size.width * (0.2f + i * 0.15f)
-            val bubbleRadius = 5f + i * 2f
-
-            drawCircle(
-                color = Color.White.copy(alpha = 0.7f), // Brighter bubbles
-                radius = bubbleRadius,
-                center = Offset(
-                    bubbleX + sin(waveOffset * 0.01f + i) * 20f,
-                    bubbleY + sin(waveOffset * 0.02f + i) * 10f
-                )
-            )
-        }
-        // --- END OF GRAPH COLOR UPDATE ---
+        // Add a subtle glow line at the wave top
+        drawPath(
+            path = Path().apply {
+                moveTo(0f, fillHeight)
+                var x = 0f
+                while (x <= size.width) {
+                    val angle = ((x / (size.width / 2f)) * 360f + waveOffset) * (Math.PI / 180f).toFloat()
+                    val y = fillHeight + sin(angle) * 8f
+                    lineTo(x, y)
+                    x += 5f
+                }
+            },
+            color = Color.White.copy(alpha = 0.5f),
+            style = Stroke(width = 2.dp.toPx())
+        )
     }
 }
 
