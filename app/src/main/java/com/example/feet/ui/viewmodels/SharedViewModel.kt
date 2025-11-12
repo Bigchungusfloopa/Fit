@@ -6,39 +6,24 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.example.feet.data.database.*
+import com.example.feet.data.repository.FitnessRepository
 import com.example.feet.services.MediaNotificationListener
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-// --- IMPORTANT: Change from ViewModel to AndroidViewModel ---
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Data class to hold historical water data
-    data class WaterData(
-        val date: String, // "YYYY-MM-DD" format
-        val totalMl: Int
-    )
+    // Initialize database and repository
+    private val database = FitnessDatabase.getDatabase(application)
+    private val repository = FitnessRepository(database)
 
-    private val _dailyGoalMl = MutableStateFlow(4000) // 4 liters
-    val dailyGoalMl: StateFlow<Int> = _dailyGoalMl
-
-    var glassSizeMl by mutableStateOf(250f)
-
-    private val _todayWater = MutableStateFlow(0)
-    val todayWater: StateFlow<Int> = _todayWater
-
-    private val _waterHistory = MutableStateFlow<List<WaterData>>(emptyList())
-    val waterHistory: StateFlow<List<WaterData>> = _waterHistory
-
-    // --- NEW MEDIA TRACKING ---
+    // Media tracking - DEFINED BEFORE init BLOCK
     private val _currentTrack = MutableStateFlow<String?>(null)
     val currentTrack: StateFlow<String?> = _currentTrack
 
@@ -54,141 +39,133 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Initialize preferences on startup
     init {
-        // Register the receiver
+        viewModelScope.launch {
+            repository.initializePreferences()
+            loadTodayData()
+        }
+
+        // Register media update receiver
         LocalBroadcastManager.getInstance(application).registerReceiver(
             mediaUpdateReceiver,
             IntentFilter(MediaNotificationListener.ACTION_MEDIA_UPDATE)
         )
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        // Unregister the receiver
-        LocalBroadcastManager.getInstance(getApplication()).unregisterReceiver(mediaUpdateReceiver)
+    private fun getTodayDate(): String {
+        return LocalDate.now().format(DateTimeFormatter.ISO_DATE)
     }
 
-    // --- NEW PERMISSION FUNCTIONS ---
-    fun isNotificationListenerEnabled(): Boolean {
-        val context = getApplication<Application>()
-        val enabledListeners = android.provider.Settings.Secure.getString(
-            context.contentResolver,
-            "enabled_notification_listeners"
-        )
-        val componentName = ComponentName(context, MediaNotificationListener::class.java).flattenToString()
-        return enabledListeners?.contains(componentName) == true
+    private suspend fun loadTodayData() {
+        val today = getTodayDate()
+
+        // Load water data
+        val waterRecord = repository.getWaterByDate(today)
+        if (waterRecord != null) {
+            _todayWater.value = waterRecord.totalMl
+            glassSizeMl = waterRecord.glassSize
+        }
+
+        // Load step data
+        val stepRecord = repository.getStepsByDate(today)
+        if (stepRecord != null) {
+            _todaySteps.value = stepRecord.steps
+            _dailyStepGoal.value = stepRecord.goal
+        }
+
+        // Load preferences
+        val prefs = repository.getPreferencesOnce()
+        _dailyGoalMl.value = prefs.dailyWaterGoalMl
+        _dailyStepGoal.value = prefs.dailyStepGoal
+        glassSizeMl = prefs.glassSize
     }
 
-    fun requestNotificationPermission() {
-        // This intent takes the user to the setting screen
-        val context = getApplication<Application>()
-        val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
-    }
-    // --- END NEW FUNCTIONS ---
+    // Water tracking
+    data class WaterData(val date: String, val totalMl: Int)
 
-    // ... (rest of your water, steps, and workout functions are unchanged) ...
+    private val _dailyGoalMl = MutableStateFlow(4000)
+    val dailyGoalMl: StateFlow<Int> = _dailyGoalMl
 
-    // Add one glass
+    var glassSizeMl = 250f
+        private set
+
+    private val _todayWater = MutableStateFlow(0)
+    val todayWater: StateFlow<Int> = _todayWater
+
+    val waterHistory: StateFlow<List<WaterData>> = repository.getAllWaterRecords()
+        .map { records -> records.map { WaterData(it.date, it.totalMl) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun addGlass() {
         _todayWater.value += glassSizeMl.toInt()
         saveTodayWater()
     }
 
-    // Remove one glass
     fun removeGlass() {
         val currentMl = _todayWater.value
         val glassSize = glassSizeMl.toInt()
         if (currentMl >= glassSize) {
             _todayWater.value -= glassSize
-            saveTodayWater()
-        }
-        else if (currentMl > 0) {
+        } else if (currentMl > 0) {
             _todayWater.value = 0
-            saveTodayWater()
         }
+        saveTodayWater()
     }
 
-    // Save today's water
     private fun saveTodayWater() {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
-        val existingIndex = _waterHistory.value.indexOfFirst { it.date == today }
-
-        val newWaterData = WaterData(
-            date = today,
-            totalMl = _todayWater.value
-        )
-
-        if (existingIndex >= 0) {
-            val updatedHistory = _waterHistory.value.toMutableList()
-            updatedHistory[existingIndex] = newWaterData
-            _waterHistory.value = updatedHistory
-        } else {
-            _waterHistory.value = _waterHistory.value + newWaterData
+        viewModelScope.launch {
+            repository.insertOrUpdateWater(getTodayDate(), _todayWater.value, glassSizeMl)
         }
     }
 
-    // Set custom glass size
     fun setGlassSize(sizeMl: Float) {
         glassSizeMl = sizeMl
+        viewModelScope.launch {
+            repository.updateGlassSize(sizeMl)
+        }
+        saveTodayWater()
     }
 
-    // Set daily goal from Liters
     fun setDailyGoal(goalLiters: Float) {
         if (goalLiters > 0) {
-            _dailyGoalMl.value = (goalLiters * 1000).toInt()
+            val goalMl = (goalLiters * 1000).toInt()
+            _dailyGoalMl.value = goalMl
+            viewModelScope.launch {
+                repository.updateDailyWaterGoal(goalMl)
+            }
         }
     }
 
-
-    // Get current glass size in ml
     fun getGlassSize(): Float = glassSizeMl
 
-    // Get number of glasses consumed
     fun getGlassesConsumed(): Int {
-        val glasses = if (glassSizeMl > 0) {
-            (_todayWater.value / glassSizeMl).toInt()
-        } else {
-            0
-        }
-        return glasses.coerceAtLeast(0)
+        return if (glassSizeMl > 0) {
+            (_todayWater.value / glassSizeMl).toInt().coerceAtLeast(0)
+        } else 0
     }
 
-    // Get number of glasses needed to reach goal
     fun getGlassesGoal(): Int {
         return if (glassSizeMl > 0) {
             (_dailyGoalMl.value / glassSizeMl).toInt()
-        } else {
-            16
-        }
+        } else 16
     }
 
-    // Get water progress
     fun getWaterProgress(): Float {
         if (_dailyGoalMl.value == 0) return 0f
-        val progress = (_todayWater.value.toFloat() / _dailyGoalMl.value)
-        return progress.coerceIn(0f, 1f)
+        return (_todayWater.value.toFloat() / _dailyGoalMl.value).coerceIn(0f, 1f)
     }
 
-    // Get remaining glasses
     fun getRemainingGlasses(): Int {
-        val remaining = getGlassesGoal() - getGlassesConsumed()
-        return remaining.coerceAtLeast(0)
+        return (getGlassesGoal() - getGlassesConsumed()).coerceAtLeast(0)
     }
 
-    // Get remaining water in ml
     fun getRemainingWaterMl(): Int {
-        val remaining = _dailyGoalMl.value - _todayWater.value
-        return remaining.coerceAtLeast(0)
+        return (_dailyGoalMl.value - _todayWater.value).coerceAtLeast(0)
     }
 
-    // Steps
-    data class StepData(
-        val date: String,
-        val steps: Int,
-        val goal: Int
-    )
+    // Steps tracking
+    data class StepData(val date: String, val steps: Int, val goal: Int)
 
     private val _dailyStepGoal = MutableStateFlow(10000)
     val dailyStepGoal: StateFlow<Int> = _dailyStepGoal
@@ -196,8 +173,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     private val _todaySteps = MutableStateFlow(0)
     val todaySteps: StateFlow<Int> = _todaySteps
 
-    private val _stepHistory = MutableStateFlow<List<StepData>>(emptyList())
-    val stepHistory: StateFlow<List<StepData>> = _stepHistory
+    val stepHistory: StateFlow<List<StepData>> = repository.getAllStepRecords()
+        .map { records -> records.map { StepData(it.date, it.steps, it.goal) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isLiveTracking = MutableStateFlow(false)
     val isLiveTracking: StateFlow<Boolean> = _isLiveTracking
@@ -218,38 +196,22 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     fun setDailyStepGoal(goal: Int) {
         if (goal > 0) {
             _dailyStepGoal.value = goal
+            viewModelScope.launch {
+                repository.updateDailyStepGoal(goal)
+            }
             saveTodaySteps()
         }
     }
 
     fun simulateStepUpdate() {
-        if (!_isLiveTracking.value) {
-            val randomSteps = (50..200).random()
-            _todaySteps.value += randomSteps
-            saveTodaySteps()
-        } else {
-            val randomSteps = (10..50).random()
-            _todaySteps.value += randomSteps
-            saveTodaySteps()
-        }
+        val randomSteps = if (!_isLiveTracking.value) (50..200).random() else (10..50).random()
+        _todaySteps.value += randomSteps
+        saveTodaySteps()
     }
 
     private fun saveTodaySteps() {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
-        val existingIndex = _stepHistory.value.indexOfFirst { it.date == today }
-
-        val newStepData = StepData(
-            date = today,
-            steps = _todaySteps.value,
-            goal = _dailyStepGoal.value
-        )
-
-        if (existingIndex >= 0) {
-            val updatedHistory = _stepHistory.value.toMutableList()
-            updatedHistory[existingIndex] = newStepData
-            _stepHistory.value = updatedHistory
-        } else {
-            _stepHistory.value = _stepHistory.value + newStepData
+        viewModelScope.launch {
+            repository.insertOrUpdateSteps(getTodayDate(), _todaySteps.value, _dailyStepGoal.value)
         }
     }
 
@@ -257,17 +219,15 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         val goal = _dailyStepGoal.value
         return if (goal > 0) {
             (_todaySteps.value.toFloat() / goal).coerceAtMost(1.0f)
-        } else {
-            0f
-        }
+        } else 0f
     }
 
     fun getWeekHistory(): List<StepData> {
-        return _stepHistory.value.takeLast(7).reversed()
+        return stepHistory.value.takeLast(7).reversed()
     }
 
     fun getMonthHistory(): List<StepData> {
-        return _stepHistory.value.takeLast(30).reversed()
+        return stepHistory.value.takeLast(30).reversed()
     }
 
     fun calculateCalories(): Int {
@@ -284,9 +244,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         saveTodaySteps()
     }
 
-    fun isStepTrackingAvailable(): Boolean {
-        return true
-    }
+    fun isStepTrackingAvailable(): Boolean = true
 
     fun getTrackingStatus(): String {
         return when {
@@ -306,37 +264,83 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         val completed: Boolean = false
     )
 
-    enum class GoalType {
-        REPS, KM
-    }
+    enum class GoalType { REPS, KM }
 
-    private val _todayWorkouts = MutableStateFlow<List<Workout>>(emptyList())
-    val todayWorkouts: StateFlow<List<Workout>> = _todayWorkouts
+    val todayWorkouts: StateFlow<List<Workout>> = repository.getWorkoutsByDate(getTodayDate())
+        .map { entities ->
+            entities.map { entity ->
+                Workout(
+                    id = entity.id,
+                    name = entity.name,
+                    duration = entity.duration,
+                    goalValue = entity.goalValue,
+                    goalType = if (entity.goalType == "REPS") GoalType.REPS else GoalType.KM,
+                    completed = entity.completed
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun addCustomWorkout(name: String, duration: Int?, goalValue: Int, goalType: GoalType) {
-        val newId = (_todayWorkouts.value.maxOfOrNull { it.id } ?: 0) + 1
-        val newWorkout = Workout(
-            id = newId,
-            name = name,
-            duration = duration,
-            goalValue = goalValue,
-            goalType = goalType
-        )
-        _todayWorkouts.value = _todayWorkouts.value + newWorkout
+        viewModelScope.launch {
+            repository.insertWorkout(
+                date = getTodayDate(),
+                name = name,
+                duration = duration,
+                goalValue = goalValue,
+                goalType = goalType.name,
+                completed = false
+            )
+        }
     }
 
     fun deleteWorkout(workoutId: Long) {
-        _todayWorkouts.value = _todayWorkouts.value.filter { it.id != workoutId }
+        viewModelScope.launch {
+            repository.deleteWorkout(workoutId)
+        }
     }
 
     fun toggleWorkout(id: Long) {
-        _todayWorkouts.value = _todayWorkouts.value.map { workout ->
-            if (workout.id == id) workout.copy(completed = !workout.completed)
-            else workout
+        viewModelScope.launch {
+            val workouts = todayWorkouts.value
+            val workout = workouts.find { it.id == id } ?: return@launch
+
+            val entity = WorkoutEntity(
+                id = workout.id,
+                date = getTodayDate(),
+                name = workout.name,
+                duration = workout.duration,
+                goalValue = workout.goalValue,
+                goalType = workout.goalType.name,
+                completed = !workout.completed
+            )
+            repository.updateWorkout(entity)
         }
     }
 
     fun getCompletedWorkoutsCount(): Int {
-        return _todayWorkouts.value.count { it.completed }
+        return todayWorkouts.value.count { it.completed }
+    }
+
+    fun isNotificationListenerEnabled(): Boolean {
+        val context = getApplication<Application>()
+        val enabledListeners = android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            "enabled_notification_listeners"
+        )
+        val componentName = ComponentName(context, MediaNotificationListener::class.java).flattenToString()
+        return enabledListeners?.contains(componentName) == true
+    }
+
+    fun requestNotificationPermission() {
+        val context = getApplication<Application>()
+        val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        LocalBroadcastManager.getInstance(getApplication()).unregisterReceiver(mediaUpdateReceiver)
     }
 }
