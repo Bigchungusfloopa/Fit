@@ -94,26 +94,6 @@ Whether you're counting steps, tracking water intake, or managing workouts, Feet
 
 ---
 
-## 🖼️ Screenshots
-
-<div align="center">
-
-### Steps Tracking
-*Track your daily steps with beautiful visual progress*
-
-### Hydration Monitor
-*Stay hydrated with easy glass tracking*
-
-### Workout Planner
-*Plan and complete your daily workouts*
-
-### Weather Widget
-*Stay informed with live weather updates*
-
-</div>
-
----
-
 ## 🛠️ Tech Stack
 
 ### Core Technologies
