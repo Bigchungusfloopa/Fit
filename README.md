@@ -1,4 +1,4 @@
-# Feet - Your Personal Fitness Companion
+#   Feet - Your Personal Fitness Companion
 
 <div align="center">
 
@@ -11,7 +11,7 @@
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=flat-square&logo=jetpack-compose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-Personal-orange?style=flat-square)](LICENSE)
 
-
+[Features](#-features) • [Tech Stack](#-tech-stack) • [Installation](#-installation) • [Architecture](#-architecture)
 
 </div>
 
