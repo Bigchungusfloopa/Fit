@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    ```
 
     <!-- Step Sensor Features (not required, so app works on devices without them) -->
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
@@ -50,6 +53,34 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Steps Widget -->
+        <receiver
+            android:name=".widgets.StepsWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.feet.ACTION_ADD_STEPS" />
+                <action android:name="com.example.feet.ACTION_RESET_STEPS" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/steps_widget_info" />
+        </receiver>
+
+        <!-- Water Widget -->
+        <receiver
+            android:name=".widgets.WaterWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.feet.ACTION_ADD_WATER" />
+                <action android:name="com.example.feet.ACTION_REMOVE_WATER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/water_widget_info" />
+        </receiver>
 
     </application>
 

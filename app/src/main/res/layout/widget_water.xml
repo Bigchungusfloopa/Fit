@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_water_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_background"
+    android:gravity="center">
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hydration"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:alpha="0.9"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Water Count -->
+    <TextView
+        android:id="@+id/widget_water_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0.0L"
+        android:textColor="#FFFFFF"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:alpha="0.95"
+        android:layout_marginBottom="2dp" />
+
+    <!-- Glasses Count -->
+    <TextView
+        android:id="@+id/widget_water_glasses"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 glasses"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:alpha="0.7"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Progress Bar -->
+    <ProgressBar
+        android:id="@+id/widget_water_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="12dp"
+        android:progressTint="#FFFFFF"
+        android:progressBackgroundTint="#40FFFFFF"
+        android:max="100"
+        android:progress="0" />
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="2">
+
+        <!-- Remove Glass Button -->
+        <TextView
+            android:id="@+id/widget_water_remove"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="- Glass"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:alpha="0.9"
+            android:padding="8dp"
+            android:gravity="center"
+            android:background="@drawable/widget_button_background"
+            android:layout_marginEnd="4dp" />
+
+        <!-- Add Glass Button -->
+        <TextView
+            android:id="@+id/widget_water_add"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+ Glass"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:alpha="0.9"
+            android:padding="8dp"
+            android:gravity="center"
+            android:background="@drawable/widget_button_background"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+</LinearLayout>

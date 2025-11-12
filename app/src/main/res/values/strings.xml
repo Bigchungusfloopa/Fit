@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Feet</string>
+    <string name="steps_widget_description">Track your daily steps</string>
+    <string name="water_widget_description">Track your water intake</string>
 </resources>

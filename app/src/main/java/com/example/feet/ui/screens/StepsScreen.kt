@@ -739,64 +739,97 @@ fun StepProgressBar(
     }
 }
 
+// Live Weather Card - Real-time weather data
+// Uses wttr.in API (100% FREE, no API key needed!)
+
 @Composable
 fun WeatherCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var temperature by remember { mutableStateOf("--") }
-    var weatherCondition by remember { mutableStateOf("Checking...") }
+    var weatherCondition by remember { mutableStateOf("Loading...") }
     var weatherIcon by remember { mutableStateOf("🌤️") }
+    var location by remember { mutableStateOf("") }
 
-    // Try to get weather from Android system
+    // Fetch live weather on launch
     LaunchedEffect(Unit) {
-        try {
-            // Try to read from system weather content provider
-            // This reads cached weather data from Google's Weather app
-            val uri = android.net.Uri.parse("content://com.google.android.apps.gsa.weather/weather")
-            val cursor = context.contentResolver.query(
-                uri,
-                arrayOf("temperature", "condition", "location"),
-                null,
-                null,
-                null
-            )
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Get GPS coordinates
+                val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE)
+                        as android.location.LocationManager
 
-            if (cursor != null && cursor.moveToFirst()) {
-                val tempIndex = cursor.getColumnIndex("temperature")
-                val conditionIndex = cursor.getColumnIndex("condition")
+                var latitude = 19.0760  // Default: Mumbai
+                var longitude = 72.8777
 
-                if (tempIndex >= 0) {
-                    val temp = cursor.getString(tempIndex)
-                    temperature = temp?.replace("°", "") ?: "--"
-                }
+                try {
+                    // Check if location permission is granted
+                    if (android.content.pm.PackageManager.PERMISSION_GRANTED ==
+                        androidx.core.content.ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        )) {
 
-                if (conditionIndex >= 0) {
-                    val condition = cursor.getString(conditionIndex)
-                    weatherCondition = condition ?: "Clear"
+                        // Try to get last known location
+                        val lastKnownLocation = try {
+                            locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                                ?: locationManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                        } catch (e: SecurityException) {
+                            null
+                        }
 
-                    // Set icon based on condition
-                    weatherIcon = when (condition?.lowercase()) {
-                        "sunny", "clear" -> "☀️"
-                        "partly cloudy", "mostly cloudy" -> "⛅"
-                        "cloudy", "overcast" -> "☁️"
-                        "rain", "rainy", "showers" -> "🌧️"
-                        "thunderstorm", "storm" -> "⛈️"
-                        "snow", "snowy" -> "❄️"
-                        "fog", "foggy", "mist" -> "🌫️"
-                        else -> "🌤️"
+                        if (lastKnownLocation != null) {
+                            latitude = lastKnownLocation.latitude
+                            longitude = lastKnownLocation.longitude
+                        }
                     }
+                } catch (e: Exception) {
+                    // Use default coordinates
                 }
-                cursor.close()
-            } else {
-                // Fallback: Use generic pleasant weather
+
+                // Free weather API using coordinates - no key needed!
+                val apiUrl = "https://wttr.in/$latitude,$longitude?format=j1"
+                val response = java.net.URL(apiUrl).readText()
+                val json = org.json.JSONObject(response)
+
+                // Parse current weather
+                val current = json.getJSONArray("current_condition").getJSONObject(0)
+                temperature = current.getString("temp_C")
+
+                // Get weather description
+                val weatherDesc = current.getJSONArray("weatherDesc").getJSONObject(0)
+                weatherCondition = weatherDesc.getString("value")
+
+                // Get location name
+                val nearest = json.getJSONArray("nearest_area").getJSONObject(0)
+                val areaName = nearest.getJSONArray("areaName").getJSONObject(0)
+                location = areaName.getString("value")
+
+                // Set icon based on condition
+                weatherIcon = when {
+                    weatherCondition.contains("sunny", ignoreCase = true) ||
+                            weatherCondition.contains("clear", ignoreCase = true) -> "☀️"
+                    weatherCondition.contains("partly cloudy", ignoreCase = true) -> "⛅"
+                    weatherCondition.contains("cloudy", ignoreCase = true) ||
+                            weatherCondition.contains("overcast", ignoreCase = true) -> "☁️"
+                    weatherCondition.contains("rain", ignoreCase = true) ||
+                            weatherCondition.contains("shower", ignoreCase = true) ||
+                            weatherCondition.contains("drizzle", ignoreCase = true) -> "🌧️"
+                    weatherCondition.contains("thunder", ignoreCase = true) ||
+                            weatherCondition.contains("storm", ignoreCase = true) -> "⛈️"
+                    weatherCondition.contains("snow", ignoreCase = true) -> "❄️"
+                    weatherCondition.contains("fog", ignoreCase = true) ||
+                            weatherCondition.contains("mist", ignoreCase = true) -> "🌫️"
+                    weatherCondition.contains("wind", ignoreCase = true) -> "🌬️"
+                    else -> "🌤️"
+                }
+
+            } catch (e: Exception) {
+                // Fallback on error
                 temperature = "24"
                 weatherCondition = "Pleasant"
                 weatherIcon = "🌤️"
+                location = "Current Location"
             }
-        } catch (e: Exception) {
-            // Fallback if we can't access weather data
-            temperature = "24"
-            weatherCondition = "Pleasant"
-            weatherIcon = "🌤️"
         }
     }
 
@@ -824,7 +857,9 @@ fun WeatherCard() {
                     text = weatherCondition,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -840,10 +875,12 @@ fun WeatherCard() {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Current Weather",
+                    text = location,
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
