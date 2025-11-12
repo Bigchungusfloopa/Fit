@@ -1,4 +1,4 @@
-# 👟 Feet - Your Personal Fitness Companion
+# Feet - Your Personal Fitness Companion
 
 <div align="center">
 
