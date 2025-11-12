@@ -38,13 +38,13 @@ class WaterWidgetSynced : AppWidgetProvider() {
         when (intent.action) {
             ACTION_ADD_WATER -> {
                 widgetScope.launch {
-                    addWater(context, 250)
+                    addWater(context)
                     updateAllWidgets(context)
                 }
             }
             ACTION_REMOVE_WATER -> {
                 widgetScope.launch {
-                    removeWater(context, 250)
+                    removeWater(context)
                     updateAllWidgets(context)
                 }
             }
@@ -64,23 +64,23 @@ class WaterWidgetSynced : AppWidgetProvider() {
         }
     }
 
-    private suspend fun addWater(context: Context, ml: Int) {
+    private suspend fun addWater(context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 val database = FitnessDatabase.getDatabase(context)
                 val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
 
+                // Get glass size from preferences (this is the user's custom glass size)
+                val prefs = database.preferencesDao().getPreferencesOnce()
+                val glassSize = prefs?.glassSize ?: 250f
+                val goal = prefs?.dailyWaterGoalMl ?: 4000
+
                 // Get current water from database
                 val currentRecord = database.waterDao().getWaterByDate(today)
                 val currentWater = currentRecord?.totalMl ?: 0
-                val glassSize = currentRecord?.glassSize ?: 250f
 
-                // Get goal from preferences
-                val prefs = database.preferencesDao().getPreferencesOnce()
-                val goal = prefs?.dailyWaterGoalMl ?: 4000
-
-                // Add water (don't exceed goal)
-                val newWater = (currentWater + ml).coerceAtMost(goal)
+                // Add water using CUSTOM glass size (don't exceed goal)
+                val newWater = (currentWater + glassSize.toInt()).coerceAtMost(goal)
 
                 database.waterDao().insertWater(
                     com.example.feet.data.database.WaterRecord(
@@ -95,19 +95,22 @@ class WaterWidgetSynced : AppWidgetProvider() {
         }
     }
 
-    private suspend fun removeWater(context: Context, ml: Int) {
+    private suspend fun removeWater(context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 val database = FitnessDatabase.getDatabase(context)
                 val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
 
+                // Get glass size from preferences (this is the user's custom glass size)
+                val prefs = database.preferencesDao().getPreferencesOnce()
+                val glassSize = prefs?.glassSize ?: 250f
+
                 // Get current water from database
                 val currentRecord = database.waterDao().getWaterByDate(today)
                 val currentWater = currentRecord?.totalMl ?: 0
-                val glassSize = currentRecord?.glassSize ?: 250f
 
-                // Remove water (don't go below 0)
-                val newWater = (currentWater - ml).coerceAtLeast(0)
+                // Remove water using CUSTOM glass size (don't go below 0)
+                val newWater = (currentWater - glassSize.toInt()).coerceAtLeast(0)
 
                 database.waterDao().insertWater(
                     com.example.feet.data.database.WaterRecord(
