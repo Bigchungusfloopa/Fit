@@ -56,26 +56,27 @@
 
         <!-- Steps Widget -->
         <receiver
-            android:name=".widgets.StepsWidget"
+            android:name=".widgets.StepsWidgetSynced"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.feet.ACTION_ADD_STEPS" />
-                <action android:name="com.example.feet.ACTION_RESET_STEPS" />
+                <action android:name="com.example.feet.ACTION_ADD_STEPS_SYNCED" />
+                <action android:name="com.example.feet.ACTION_REFRESH_STEPS_WIDGET" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/steps_widget_info" />
         </receiver>
 
-        <!-- Water Widget -->
+        <!-- Water Widget (Synced with Room Database) -->
         <receiver
-            android:name=".widgets.WaterWidget"
+            android:name=".widgets.WaterWidgetSynced"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.feet.ACTION_ADD_WATER" />
-                <action android:name="com.example.feet.ACTION_REMOVE_WATER" />
+                <action android:name="com.example.feet.ACTION_ADD_WATER_SYNCED" />
+                <action android:name="com.example.feet.ACTION_REMOVE_WATER_SYNCED" />
+                <action android:name="com.example.feet.ACTION_REFRESH_WATER_WIDGET" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

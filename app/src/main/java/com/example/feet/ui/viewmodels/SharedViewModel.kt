@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.lifecycle.AndroidViewModel
+import com.example.feet.widgets.StepsWidgetSynced
+import com.example.feet.widgets.WaterWidgetSynced
 import androidx.lifecycle.viewModelScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.feet.data.database.*
@@ -116,6 +118,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     private fun saveTodayWater() {
         viewModelScope.launch {
             repository.insertOrUpdateWater(getTodayDate(), _todayWater.value, glassSizeMl)
+
+            // Notify widget to update
+            WaterWidgetSynced.notifyDataChanged(getApplication())
         }
     }
 
@@ -212,6 +217,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     private fun saveTodaySteps() {
         viewModelScope.launch {
             repository.insertOrUpdateSteps(getTodayDate(), _todaySteps.value, _dailyStepGoal.value)
+
+            // Notify widget to update
+            StepsWidgetSynced.notifyDataChanged(getApplication())
         }
     }
 
