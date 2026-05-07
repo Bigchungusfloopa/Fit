@@ -34,28 +34,32 @@
 - **Simulation Mode** - Manual step addition for testing or non-sensor devices
 
 ### Running Tracer
-- **Live Run details** - Real-time tracking of running distance, time, pace, calories burned, and heart rate (if available).
-- **GPS Tracking** - Precise GPS tracking to map your running routes.
-- **Historical Data** - View last 30 days of running history with calendar view.
-- **Progress Visualization** - Reactive progress bars and charts.
-- **Simulation Mode** - Manual step addition for testing or non-sensor devices.
+- **Live Run details** - Real-time tracking of distance, time, pace, and elevation gain
+- **GPS Path Tracing** - Live route visualization on a dark-themed Google Map
+- **Run Analytics** - Detailed details modal with traced path drawing and interactive zoom
+- **Performance Charts** - Dynamic Speed and Pace charts for every run session
+- **Historical Records** - View and manage your past running activities
 
 ### Water Tracking
 - **Glass-Based Tracking** - Add/remove water by glass
 - **Customizable Glass Size** - Set your preferred glass size (ml)
 - **Daily Goal Management** - Customize your hydration targets
-- **Visual Progress** - Animated water fill with wave effects
-- **Liters & Glasses Display** - Dual unit tracking
+- **Glass Animation** - Fluid liquid fill animations
 - **Quick Actions** - Preset buttons for common glass sizes (100ml, 250ml, 500ml)
 - **History View** - Track last 10 days of hydration
 
 ### Workout Management
-- **Custom Workouts** - Create personalized workout plans
-- **Goal Types** - Support for reps-based and distance-based goals
-- **Duration Tracking** - Optional time tracking for each workout
-- **Completion Status** - Mark workouts as complete with visual feedback
-- **Today's Workouts** - Quick view of daily workout plans
-- **Delete & Edit** - Full CRUD operations for workout management
+- **Automatic Persistence** - Daily workouts automatically carry over from the previous day
+- **Workout History** - Quick-view cards for the last 3 days and an all-time history viewer
+- **Custom Workouts** - Create personalized workout plans with reps or duration goals
+- **Edit & Delete** - Refined management with icon-based quick actions
+- **Progress Tracking** - Real-time percentage completion for daily targets
+
+### Security & Polish
+- **API Key Hiding** - API keys are protected using the Plugins
+- **Frosted Blur Edges** - Custom fading edges on all scrollable lists for a premium glass look
+- **Bouncy Interactions** - Physics-based spring animations on all clickable elements
+- **Glassmorphic UI** - High-fidelity translucent components and vibrant gradients
 
 ### Weather Integration
 - **Live Weather Data** - Real-time weather using GPS location
@@ -70,7 +74,7 @@
 - **Media Controls** - Quick access to music player
 - **Notification Listener** - Seamless integration with music apps
 
-### 📱 Home Screen Widgets
+### Home Screen Widgets
 - **Steps Widget** - Quick step tracking from home screen
   - Current step count
   - Progress bar
@@ -164,41 +168,44 @@ implementation("androidx.glance:glance-appwidget")
 com.example.feet/
 ├── data/
 │   ├── database/
-│   │   ├── Entities.kt          # Room entities
-│   │   ├── DAOs.kt              # Data Access Objects
-│   │   ├── FitnessDatabase.kt   # Database instance
-│   │   └── FitnessRepository.kt # Repository layer
-│   └── models/                   # Data models
+│   │   ├── Entities.kt          # Room entities (Steps, Water, Workouts, Runs, Timers)
+│   │   ├── Daos.kt              # Data Access Objects
+│   │   └── AppDatabase.kt       # Database instance
+│   └── repository/
+│       └── FitnessRepository.kt # Repository layer
 │
 ├── ui/
 │   ├── screens/
 │   │   ├── StepsScreen.kt       # Steps tracking UI
-│   │   ├── WaterScreen.kt       # Hydration tracking UI
-│   │   ├── WorkoutScreen.kt     # Workout management UI
+│   │   ├── Enhancedwaterscreen.kt # Hydration tracking UI
+│   │   ├── WorkoutScreen.kt     # Workout management & History UI
+│   │   ├── RunningSection.kt    # Running tracker & Map details UI
+│   │   ├── TimeScreen.kt        # Timers & Stopwatch UI
 │   │   └── MainScreen.kt        # Navigation container
 │   │
 │   ├── components/
-│   │   ├── LiquidGlassButton.kt # Custom button component
-│   │   ├── TranslucentBox.kt    # Glassmorphic container
-│   │   ├── ColorBends.kt        # Gradient backgrounds
-│   │   └── ProgressIndicator.kt # Custom progress bars
+│   │   ├── LiquidGlassButton.kt # Premium glass button
+│   │   ├── TranslucentBox.kt    # Frosted glass container
+│   │   ├── GlassDialogBox.kt    # Modal glass container
+│   │   ├── GlassAccentColors.kt # Color palette provider
+│   │   └── Modifiers.kt         # Custom modifiers (fadingEdges, etc.)
 │   │
 │   ├── theme/
-│   │   ├── Color.kt             # Color definitions
-│   │   ├── Theme.kt             # Material3 theme
+│   │   ├── Color.kt             # Design system colors
+│   │   ├── Theme.kt             # Glassmorphic M3 theme
 │   │   └── Type.kt              # Typography
 │   │
 │   └── viewmodels/
-│       └── SharedViewModel.kt    # Main ViewModel
-│
-├── widgets/
-│   ├── StepsWidget.kt           # Steps home screen widget
-│   └── WaterWidget.kt           # Water home screen widget
+│       ├── SharedViewModel.kt    # Core app state
+│       └── RunningViewModel.kt   # GPS & Running state
 │
 ├── services/
-│   └── MediaNotificationListener.kt # Music integration
+│   ├── StepTrackerService.kt     # Foreground tracking
+│   └── MediaNotificationListener.kt # Music sync
 │
-└── MainActivity.kt               # Entry point
+└── widgets/
+    ├── StepsWidgetSynced.kt      # Persistent step widget
+    └── WaterWidgetSynced.kt      # Persistent water widget
 ```
 
 ---
@@ -288,7 +295,7 @@ com.example.feet/
 ┌─────────────┐
 │  Database   │  (Room)
 │   (DAO)     │
-└─────────────┘
+└──────┴──────┘
 ```
 
 ### Data Flow
@@ -307,14 +314,20 @@ com.example.feet/
 ### Color Palette
 
 ```kotlin
-// Primary Colors
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Dark Backgrounds
+val DarkBg = Color(0xFF0A0A0F)
+val DeepSpace = Color(0xFF080810)
 
-// Glassmorphic Colors
-val GlassWhite = Color(0x30FFFFFF)
-val GlassBorder = Color(0x40FFFFFF)
+// Glass Tokens
+val GlassWhite = Color(0x1AFFFFFF) // Frosted overlay
+val GlassBorder = Color(0x33FFFFFF) // Subtle edge
+
+// Accent Palette (Activity Specific)
+val PacePurple = Color(0xFF7B61FF)
+val DistanceCyan = Color(0xFF00BCD4)
+val TimeGreen = Color(0xFF00E676)
+val SpeedPink = Color(0xFFE91E63)
+val ElevationAmber = Color(0xFFFFC107)
 ```
 
 ### Typography
@@ -344,44 +357,27 @@ bodyMedium: 14sp, Regular
 
 ## Database Schema
 
-### Tables
+### Entities
 
-#### **water_records**
-| Column | Type | Description |
-|--------|------|-------------|
-| date | String (PK) | Date in YYYY-MM-DD format |
-| totalMl | Int | Total water in milliliters |
-| glassSize | Float | Size of each glass |
-| timestamp | Long | Record timestamp |
+| Entity | Description |
+| :--- | :--- |
+| **StepRecord** | Daily step count, goal, and timestamps. |
+| **WaterRecord** | Hydration tracking (ml) and daily targets. |
+| **WorkoutEntity** | Exercise names, rep/distance goals, and completion status. |
+| **RunRecordEntity** | Detailed run metrics: duration, distance, pace, elevation, and GPS path points. |
+| **TimerEntity** | State and remaining time for custom countdown timers. |
+| **StopwatchEntity** | Persistent state for the stopwatch across app restarts. |
+| **LapRecordEntity** | Individual lap timestamps for running sessions. |
+| **UserPreferences** | Global settings: goals, glass sizes, and user vitals (weight/height). |
 
-#### **step_records**
-| Column | Type | Description |
-|--------|------|-------------|
-| date | String (PK) | Date in YYYY-MM-DD format |
-| steps | Int | Total steps |
-| goal | Int | Step goal |
-| timestamp | Long | Record timestamp |
+### UserPreferences Schema
 
-#### **workout_records**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | Long (PK) | Auto-generated ID |
-| date | String | Date in YYYY-MM-DD format |
-| name | String | Workout name |
-| duration | Int? | Duration in minutes |
-| goalValue | Int | Goal value |
-| goalType | String | "REPS" or "KM" |
-| completed | Boolean | Completion status |
-| timestamp | Long | Record timestamp |
-
-#### **user_preferences**
 | Column | Type | Description |
 |--------|------|-------------|
 | id | Int (PK) | Always 1 (single row) |
 | dailyWaterGoalMl | Int | Daily water goal |
 | dailyStepGoal | Int | Daily step goal |
 | glassSize | Float | Default glass size |
-| timestamp | Long | Last updated |
 
 ---
 
