@@ -4,36 +4,51 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="18dp"
     android:background="@drawable/widget_background"
-    android:gravity="center">
+    android:gravity="center_horizontal">
 
-    <!-- Title -->
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Header row: icon + title -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Steps Today"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:alpha="0.9"
-        android:layout_marginBottom="8dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
 
-    <!-- Steps Count -->
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Feet"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:alpha="0.75" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Today"
+            android:textColor="#99FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Big step count -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="4dp">
+        android:gravity="bottom"
+        android:layout_marginBottom="2dp">
 
         <TextView
             android:id="@+id/widget_steps_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0"
-            android:textColor="#FFFFFF"
-            android:textSize="32sp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="38sp"
             android:textStyle="bold"
             android:alpha="0.95" />
 
@@ -42,28 +57,36 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="/ 10000"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:alpha="0.7"
-            android:layout_marginStart="4dp"
-            android:layout_gravity="bottom"
-            android:layout_marginBottom="4dp" />
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp"
+            android:alpha="0.45"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="7dp" />
     </LinearLayout>
 
-    <!-- Progress Bar -->
+    <!-- Sub-label -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="steps"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:alpha="0.45"
+        android:layout_marginBottom="10dp" />
+
+    <!-- Progress bar — green tint for steps -->
     <ProgressBar
         android:id="@+id/widget_steps_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="8dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="12dp"
-        android:progressTint="#FFFFFF"
-        android:progressBackgroundTint="#40FFFFFF"
+        android:layout_height="6dp"
+        android:layout_marginBottom="14dp"
+        android:progressTint="#00E676"
+        android:progressBackgroundTint="#33FFFFFF"
         android:max="100"
         android:progress="0" />
 
-    <!-- Buttons -->
+    <!-- Action buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -71,37 +94,37 @@
         android:gravity="center"
         android:weightSum="2">
 
-        <!-- Add Steps Button -->
         <TextView
             android:id="@+id/widget_steps_add"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="+ 100"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:alpha="0.9"
-            android:padding="8dp"
+            android:alpha="0.85"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
             android:gravity="center"
             android:background="@drawable/widget_button_background"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="5dp" />
 
-        <!-- Reset Button -->
         <TextView
             android:id="@+id/widget_steps_reset"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Reset"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:text="Refresh"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:alpha="0.9"
-            android:padding="8dp"
+            android:alpha="0.85"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
             android:gravity="center"
             android:background="@drawable/widget_button_background"
-            android:layout_marginStart="4dp" />
+            android:layout_marginStart="5dp" />
     </LinearLayout>
 
 </LinearLayout>

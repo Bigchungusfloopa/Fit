@@ -127,10 +127,12 @@ fun FeetTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Set transparent status bar for full glass effect
-            window.statusBarColor = Color.Transparent.toArgb()
+            // Set transparent status bar for full glass effect (deprecated on API 35+)
+            @Suppress("DEPRECATION")
+            if (android.os.Build.VERSION.SDK_INT < 35) {
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+            }
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-
             // Enable edge-to-edge display
             WindowCompat.setDecorFitsSystemWindows(window, false)
         }

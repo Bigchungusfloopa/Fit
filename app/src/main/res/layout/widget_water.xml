@@ -4,58 +4,73 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="18dp"
     android:background="@drawable/widget_background"
-    android:gravity="center">
+    android:gravity="center_horizontal">
 
-    <!-- Title -->
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Header row: icon + title -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Hydration"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:alpha="0.9"
-        android:layout_marginBottom="8dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
 
-    <!-- Water Count -->
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Hydration"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:alpha="0.75" />
+
+        <!-- Live refresh timestamp placeholder -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Today"
+            android:textColor="#99FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Big water reading -->
     <TextView
         android:id="@+id/widget_water_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0.0L"
-        android:textColor="#FFFFFF"
-        android:textSize="32sp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="38sp"
         android:textStyle="bold"
         android:alpha="0.95"
         android:layout_marginBottom="2dp" />
 
-    <!-- Glasses Count -->
+    <!-- Glass count sub-label -->
     <TextView
         android:id="@+id/widget_water_glasses"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0 glasses"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:alpha="0.7"
-        android:layout_marginBottom="8dp" />
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:alpha="0.55"
+        android:layout_marginBottom="10dp" />
 
-    <!-- Progress Bar -->
+    <!-- Glass progress bar — purple tint to match app accent -->
     <ProgressBar
         android:id="@+id/widget_water_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="8dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp"
-        android:progressTint="#FFFFFF"
-        android:progressBackgroundTint="#40FFFFFF"
+        android:layout_height="6dp"
+        android:layout_marginBottom="14dp"
+        android:progressTint="#7B61FF"
+        android:progressBackgroundTint="#33FFFFFF"
         android:max="100"
         android:progress="0" />
 
-    <!-- Buttons -->
+    <!-- Action buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -63,37 +78,37 @@
         android:gravity="center"
         android:weightSum="2">
 
-        <!-- Remove Glass Button -->
         <TextView
             android:id="@+id/widget_water_remove"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="- Glass"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:text="− Glass"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:alpha="0.9"
-            android:padding="8dp"
+            android:alpha="0.85"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
             android:gravity="center"
             android:background="@drawable/widget_button_background"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="5dp" />
 
-        <!-- Add Glass Button -->
         <TextView
             android:id="@+id/widget_water_add"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="+ Glass"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:alpha="0.9"
-            android:padding="8dp"
+            android:alpha="0.85"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
             android:gravity="center"
             android:background="@drawable/widget_button_background"
-            android:layout_marginStart="4dp" />
+            android:layout_marginStart="5dp" />
     </LinearLayout>
 
 </LinearLayout>

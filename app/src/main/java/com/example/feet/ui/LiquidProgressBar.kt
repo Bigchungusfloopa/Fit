@@ -79,7 +79,7 @@ fun LiquidProgressBar(
                     if (i == 0) {
                         lineTo(x, y)
                     } else {
-                        quadraticBezierTo(
+                        quadraticTo(
                             x1 = x - waveWidth / 2,
                             y1 = height - progressHeight + sin((x - waveWidth / 2) / 50f) * 8f,
                             x2 = x,

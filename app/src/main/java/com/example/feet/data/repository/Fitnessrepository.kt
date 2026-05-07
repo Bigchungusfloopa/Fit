@@ -11,6 +11,9 @@ class FitnessRepository(private val database: FitnessDatabase) {
     private val stepDao = database.stepDao()
     private val workoutDao = database.workoutDao()
     private val preferencesDao = database.preferencesDao()
+    private val runDao = database.runDao()
+    private val timerDao = database.timerDao()
+    private val stopwatchDao = database.stopwatchDao()
 
     // Water operations
     fun getAllWaterRecords(): Flow<List<WaterRecord>> = waterDao.getAllWaterRecords()
@@ -104,9 +107,75 @@ class FitnessRepository(private val database: FitnessDatabase) {
         preferencesDao.insertPreferences(current.copy(glassSize = sizeMl))
     }
 
+    suspend fun updateBodyMetrics(weightKg: Float, heightCm: Float, targetWeightKg: Float) {
+        val current = getPreferencesOnce()
+        preferencesDao.insertPreferences(
+            current.copy(
+                weightKg = weightKg,
+                heightCm = heightCm,
+                targetWeightKg = targetWeightKg
+            )
+        )
+    }
+
     suspend fun initializePreferences() {
         if (preferencesDao.getPreferencesOnce() == null) {
             preferencesDao.insertPreferences(UserPreferences())
         }
+    }
+
+    // Run Record operations
+    fun getAllRuns(): Flow<List<RunRecordEntity>> = runDao.getAllRuns()
+
+    fun getRunsSince(daysAgo: Int): Flow<List<RunRecordEntity>> {
+        val cutoffTimestamp = System.currentTimeMillis() - (daysAgo * 24L * 60 * 60 * 1000)
+        return runDao.getRunsSince(cutoffTimestamp)
+    }
+
+    suspend fun insertRun(runRecord: RunRecordEntity): Long {
+        return runDao.insertRun(runRecord)
+    }
+
+    suspend fun deleteRun(runRecord: RunRecordEntity) {
+        runDao.deleteRun(runRecord)
+    }
+
+    suspend fun deleteOldRunRecords(daysToKeep: Int = 90) {
+        val cutoffTimestamp = System.currentTimeMillis() - (daysToKeep * 24L * 60 * 60 * 1000)
+        runDao.deleteOldRuns(cutoffTimestamp)
+    }
+
+    // Timer operations
+    fun getAllTimers(): Flow<List<TimerEntity>> = timerDao.getAllTimers()
+
+    suspend fun insertTimer(timer: TimerEntity) {
+        timerDao.insertTimer(timer)
+    }
+
+    suspend fun updateTimer(timer: TimerEntity) {
+        timerDao.updateTimer(timer)
+    }
+
+    suspend fun deleteTimer(id: Long) {
+        timerDao.deleteTimerById(id)
+    }
+
+    // Stopwatch operations
+    fun getStopwatchState(): Flow<StopwatchEntity?> = stopwatchDao.getStopwatchState()
+
+    suspend fun getStopwatchOnce(): StopwatchEntity? = stopwatchDao.getStopwatchOnce()
+
+    suspend fun updateStopwatch(stopwatch: StopwatchEntity) {
+        stopwatchDao.insertStopwatch(stopwatch)
+    }
+
+    fun getAllLaps(): Flow<List<LapRecordEntity>> = stopwatchDao.getAllLaps()
+
+    suspend fun addLap(lapMillis: Long) {
+        stopwatchDao.insertLap(LapRecordEntity(lapMillis = lapMillis))
+    }
+
+    suspend fun clearLaps() {
+        stopwatchDao.deleteAllLaps()
     }
 }

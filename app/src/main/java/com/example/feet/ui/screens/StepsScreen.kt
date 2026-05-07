@@ -8,13 +8,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,10 +30,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.feet.ui.components.ButtonSize
 import com.example.feet.ui.components.ButtonVariant
+import com.example.feet.ui.components.GlassDialogBox
 import com.example.feet.ui.components.LiquidGlassButton
 import com.example.feet.ui.components.TranslucentBox
+import com.example.feet.ui.components.glassTextFieldColors
 import com.example.feet.ui.viewmodels.SharedViewModel
 import kotlinx.coroutines.delay
+
 
 @Composable
 fun StepsScreen(viewModel: SharedViewModel) {
@@ -56,33 +60,13 @@ fun StepsScreen(viewModel: SharedViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally // Center header
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // --- HEADER UPDATED ---
-        Row(
-            modifier = Modifier.padding(top = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Show pulsing dot on the left if tracking is live
-            if (isLiveTracking) {
-                PulsingDot(
-                    color = Color(0xFF00E676),
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-            }
 
-            Text(
-                text = "Step Tracker",
-                style = MaterialTheme.typography.headlineLarge,
-                color = Color.White.copy(alpha = 0.9f),
-                fontWeight = FontWeight.Bold
-            )
-        }
-        // --- END OF UPDATE ---
 
         // Steps Card with Progress Bar and Stats
         TranslucentBox(
@@ -93,8 +77,8 @@ fun StepsScreen(viewModel: SharedViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .animateContentSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -114,7 +98,8 @@ fun StepsScreen(viewModel: SharedViewModel) {
 
                 // Progress Bar
                 StepProgressBar(
-                    progress = progress
+                    progress = progress,
+                    isLiveTracking = isLiveTracking
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -179,21 +164,6 @@ fun StepsScreen(viewModel: SharedViewModel) {
             )
         }
 
-        // Weather Card
-        WeatherCard()
-
-        // 30-Day History Preview
-        Text(
-            text = "Last 30 Days",
-            style = MaterialTheme.typography.headlineSmall,
-            color = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.padding(start = 8.dp, top = 8.dp)
-        )
-
-        StepHistoryGrid(
-            history = viewModel.getMonthHistory()
-        )
-
         // Testing Controls
         if (!viewModel.isStepTrackingAvailable()) {
             LiquidGlassButton(
@@ -216,6 +186,12 @@ fun StepsScreen(viewModel: SharedViewModel) {
             }
         )
         // --- END NOW PLAYING CARD ---
+
+        WeatherCard()
+
+        // --- RUNNING SECTION ---
+        RunningSection()
+        // --- END RUNNING SECTION ---
 
         // Set Goal Dialog
         if (showGoalDialog) {
@@ -367,164 +343,115 @@ fun SetGoalDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog( // Using standard Dialog
-        onDismissRequest = onDismiss
-    ) {
-        Box( // Styled like water screen dialog
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(20.dp)
+    Dialog(onDismissRequest = onDismiss) {
+        GlassDialogBox {
+            Text(
+                text = "Set Daily Step Goal",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            TextField(
+                value = currentGoal,
+                onValueChange = onGoalChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Step Goal") },
+                colors = glassTextFieldColors(),
+                shape = RoundedCornerShape(10.dp),
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    keyboardType = KeyboardType.Number
                 )
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Set Daily Step Goal",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Bold
+                LiquidGlassButton(
+                    onClick = { onGoalChange("5000") },
+                    text = "5,000",
+                    modifier = Modifier.weight(1f),
+                    variant = ButtonVariant.SECONDARY
                 )
-
-                TextField( // Using standard TextField
-                    value = currentGoal,
-                    onValueChange = onGoalChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Step Goal") },
-                    colors = TextFieldDefaults.colors( // Dark theme colors
-                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        focusedTextColor = Color.White.copy(alpha = 0.9f),
-                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color.White.copy(alpha = 0.9f)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    )
+                LiquidGlassButton(
+                    onClick = { onGoalChange("10000") },
+                    text = "10,000",
+                    modifier = Modifier.weight(1f),
+                    variant = ButtonVariant.SECONDARY
                 )
-
-                // Quick preset buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    LiquidGlassButton( // Replaced GlassButton
-                        onClick = { onGoalChange("5000") },
-                        text = "5,000",
-                        modifier = Modifier.weight(1f),
-                        variant = ButtonVariant.SECONDARY
-                    )
-
-                    LiquidGlassButton( // Replaced GlassButton
-                        onClick = { onGoalChange("10000") },
-                        text = "10,000",
-                        modifier = Modifier.weight(1f),
-                        variant = ButtonVariant.SECONDARY
-                    )
-
-                    LiquidGlassButton( // Replaced GlassButton
-                        onClick = { onGoalChange("15000") },
-                        text = "15,000",
-                        modifier = Modifier.weight(1f),
-                        variant = ButtonVariant.SECONDARY
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    LiquidGlassButton( // Replaced GlassButton
-                        onClick = onDismiss,
-                        text = "Cancel",
-                        modifier = Modifier.weight(1f),
-                        variant = ButtonVariant.SECONDARY
-                    )
-
-                    LiquidGlassButton( // Replaced GlassButton
-                        onClick = onConfirm,
-                        text = "Set Goal",
-                        modifier = Modifier.weight(1f),
-                        variant = ButtonVariant.PRIMARY
-                    )
-                }
+                LiquidGlassButton(
+                    onClick = { onGoalChange("15000") },
+                    text = "15,000",
+                    modifier = Modifier.weight(1f),
+                    variant = ButtonVariant.SECONDARY
+                )
             }
-        }
-    }
-}
-
-@Composable
-fun StepHistoryDialog(
-    history: List<SharedViewModel.StepData>,
-    onDismiss: () -> Unit
-) {
-    Dialog( // Using standard Dialog
-        onDismissRequest = onDismiss
-    ) {
-        Box( // Styled like water screen dialog
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(20.dp)
-                )
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Step History",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (history.isEmpty()) {
-                    Text(
-                        text = "No history available yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(vertical = 32.dp)
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.heightIn(max = 300.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(history) { stepData ->
-                            StepHistoryItem(stepData = stepData)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                LiquidGlassButton( // Replaced GlassButton
+                LiquidGlassButton(
                     onClick = onDismiss,
-                    text = "Close",
-                    modifier = Modifier.fillMaxWidth(),
+                    text = "Cancel",
+                    modifier = Modifier.weight(1f),
+                    variant = ButtonVariant.SECONDARY
+                )
+                LiquidGlassButton(
+                    onClick = onConfirm,
+                    text = "Set Goal",
+                    modifier = Modifier.weight(1f),
                     variant = ButtonVariant.PRIMARY
                 )
             }
         }
     }
 }
+
+
+@Composable
+fun StepHistoryDialog(
+    history: List<SharedViewModel.StepData>,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        GlassDialogBox {
+            Text(
+                text = "Step History",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            if (history.isEmpty()) {
+                Text(
+                    text = "No history available yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(vertical = 32.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(history) { stepData ->
+                        StepHistoryItem(stepData = stepData)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            LiquidGlassButton(
+                onClick = onDismiss,
+                text = "Close",
+                modifier = Modifier.fillMaxWidth(),
+                variant = ButtonVariant.PRIMARY
+            )
+        }
+    }
+}
+
 
 @Composable
 fun StepHistoryItem(stepData: SharedViewModel.StepData) {
@@ -673,7 +600,8 @@ fun StepDayCell(
 
 @Composable
 fun StepProgressBar(
-    progress: Float
+    progress: Float,
+    isLiveTracking: Boolean = false
 ) {
     // Animate the progress
     val animatedProgress by animateFloatAsState(
@@ -728,12 +656,18 @@ fun StepProgressBar(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isLiveTracking) {
+                        PulsingDot(color = Color(0xFF00E676), modifier = Modifier.size(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

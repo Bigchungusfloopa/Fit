@@ -1,4 +1,4 @@
-#   Feet - Your Personal Fitness Companion
+#   Feet 
 
 <div align="center">
 
@@ -17,25 +17,30 @@
 
 ---
 
-## 📱 About
+## About
 
-**Feet** is a modern, beautiful fitness tracking application built with Jetpack Compose and Material Design 3. It features a stunning glassmorphic UI that makes tracking your daily fitness goals a delightful experience.
-
-Whether you're counting steps, tracking water intake, or managing workouts, Feet provides an intuitive and visually appealing interface to keep you motivated on your fitness journey.
+ Modern, Activity tracking application built with Jetpack Compose and Material Design 3 which features a glassmorphic UI.
 
 ---
 
-## ✨ Features
+## Features
 
-### 🚶 Step Tracking
+### Step Tracking
 - **Live Step Counter** - Real-time step counting using device sensors
 - **Daily Goals** - Set and track your daily step targets
 - **Historical Data** - View last 30 days of step history with calendar view
-- **Progress Visualization** - Beautiful progress bars and charts
+- **Progress Visualization** - Reactive progress bars and charts
 - **Distance & Calories** - Automatic calculation based on steps
 - **Simulation Mode** - Manual step addition for testing or non-sensor devices
 
-### 💧 Water Tracking
+### Running Tracer
+- **Live Run details** - Real-time tracking of running distance, time, pace, calories burned, and heart rate (if available).
+- **GPS Tracking** - Precise GPS tracking to map your running routes.
+- **Historical Data** - View last 30 days of running history with calendar view.
+- **Progress Visualization** - Reactive progress bars and charts.
+- **Simulation Mode** - Manual step addition for testing or non-sensor devices.
+
+### Water Tracking
 - **Glass-Based Tracking** - Add/remove water by glass
 - **Customizable Glass Size** - Set your preferred glass size (ml)
 - **Daily Goal Management** - Customize your hydration targets
@@ -44,7 +49,7 @@ Whether you're counting steps, tracking water intake, or managing workouts, Feet
 - **Quick Actions** - Preset buttons for common glass sizes (100ml, 250ml, 500ml)
 - **History View** - Track last 10 days of hydration
 
-### 🏋️ Workout Management
+### Workout Management
 - **Custom Workouts** - Create personalized workout plans
 - **Goal Types** - Support for reps-based and distance-based goals
 - **Duration Tracking** - Optional time tracking for each workout
@@ -52,14 +57,14 @@ Whether you're counting steps, tracking water intake, or managing workouts, Feet
 - **Today's Workouts** - Quick view of daily workout plans
 - **Delete & Edit** - Full CRUD operations for workout management
 
-### 🌤️ Weather Integration
+### Weather Integration
 - **Live Weather Data** - Real-time weather using GPS location
 - **Automatic Location** - GPS-based city detection
 - **Weather Icons** - Beautiful weather condition icons (☀️ ⛅ ☁️ 🌧️ ⛈️ ❄️ 🌫️)
 - **Temperature Display** - Current temperature in Celsius
 - **Privacy Option** - Phone-cached weather for offline tracking
 
-### 🎵 Media Integration
+### Media Integration
 - **Now Playing** - Display currently playing music
 - **Artist Information** - Shows track and artist name
 - **Media Controls** - Quick access to music player
@@ -77,7 +82,7 @@ Whether you're counting steps, tracking water intake, or managing workouts, Feet
   - Add/Remove glass buttons
   - Progress visualization
 
-### 🎨 Beautiful UI/UX
+### UI/UX
 - **Glassmorphic Design** - Modern frosted glass aesthetic
 - **Animated Transitions** - Smooth animations throughout
 - **Color Bends** - Dynamic gradient backgrounds
@@ -85,7 +90,7 @@ Whether you're counting steps, tracking water intake, or managing workouts, Feet
 - **Dark Theme** - Eye-friendly dark mode design
 - **Responsive Layout** - Adapts to different screen sizes
 
-### 💾 Data Persistence
+### Data Persistence
 - **Room Database** - Local SQLite database for data storage
 - **Automatic Sync** - Real-time data synchronization
 - **90-Day History** - Automatic retention of 3 months data
@@ -94,7 +99,7 @@ Whether you're counting steps, tracking water intake, or managing workouts, Feet
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Core Technologies
 - **Language:** Kotlin 1.9+
@@ -153,7 +158,7 @@ implementation("androidx.glance:glance-appwidget")
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 com.example.feet/
@@ -198,7 +203,7 @@ com.example.feet/
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 - Android Studio Hedgehog (2023.1.1) or newer
@@ -257,7 +262,7 @@ com.example.feet/
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### MVVM Pattern
 
@@ -297,7 +302,7 @@ com.example.feet/
 
 ---
 
-## 🎨 Design System
+## Design System
 
 ### Color Palette
 
@@ -337,7 +342,7 @@ bodyMedium: 14sp, Regular
 
 ---
 
-## 📊 Database Schema
+## Database Schema
 
 ### Tables
 
@@ -380,7 +385,7 @@ bodyMedium: 14sp, Regular
 
 ---
 
-## 🔒 Privacy & Permissions
+## Privacy & Permissions
 
 ### Required Permissions
 
@@ -406,11 +411,11 @@ bodyMedium: 14sp, Regular
 
 ### Data Storage
 
-- ✅ **All data stored locally** on device
-- ✅ **No cloud sync** or external servers
-- ✅ **No analytics** or tracking
-- ✅ **No ads** or third-party SDKs
-- ✅ **Complete privacy** - your data is yours
+-  **All data stored locally** on device
+-  **No cloud sync** or external servers
+-  **No analytics** or tracking
+-  **No ads** or third-party SDKs
+-  **Complete privacy** - your data is yours
 
 ---
 
@@ -418,4 +423,4 @@ bodyMedium: 14sp, Regular
 
 **Version:** 1.0.0
 
-**Status:** Active Development 🚀
+**Status:** Active Development 

@@ -83,3 +83,60 @@ interface PreferencesDao {
     @Update
     suspend fun updatePreferences(preferences: UserPreferences)
 }
+
+@Dao
+interface RunDao {
+    @Query("SELECT * FROM run_records ORDER BY timestamp DESC")
+    fun getAllRuns(): Flow<List<RunRecordEntity>>
+
+    @Query("SELECT * FROM run_records WHERE timestamp >= :cutoffTimestamp ORDER BY timestamp DESC")
+    fun getRunsSince(cutoffTimestamp: Long): Flow<List<RunRecordEntity>>
+
+    @Insert
+    suspend fun insertRun(runRecord: RunRecordEntity): Long
+
+    @Delete
+    suspend fun deleteRun(runRecord: RunRecordEntity)
+
+    @Query("DELETE FROM run_records WHERE timestamp < :cutoffTimestamp")
+    suspend fun deleteOldRuns(cutoffTimestamp: Long)
+}
+
+@Dao
+interface TimerDao {
+    @Query("SELECT * FROM timer_records ORDER BY id ASC")
+    fun getAllTimers(): Flow<List<TimerEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTimer(timer: TimerEntity)
+
+    @Update
+    suspend fun updateTimer(timer: TimerEntity)
+
+    @Delete
+    suspend fun deleteTimer(timer: TimerEntity)
+
+    @Query("DELETE FROM timer_records WHERE id = :id")
+    suspend fun deleteTimerById(id: Long)
+}
+
+@Dao
+interface StopwatchDao {
+    @Query("SELECT * FROM stopwatch_records WHERE id = 1")
+    fun getStopwatchState(): Flow<StopwatchEntity?>
+
+    @Query("SELECT * FROM stopwatch_records WHERE id = 1")
+    suspend fun getStopwatchOnce(): StopwatchEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStopwatch(stopwatch: StopwatchEntity)
+
+    @Query("SELECT * FROM lap_records ORDER BY timestamp ASC")
+    fun getAllLaps(): Flow<List<LapRecordEntity>>
+
+    @Insert
+    suspend fun insertLap(lap: LapRecordEntity)
+
+    @Query("DELETE FROM lap_records")
+    suspend fun deleteAllLaps()
+}

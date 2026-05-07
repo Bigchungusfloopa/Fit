@@ -6,17 +6,29 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -25,14 +37,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.feet.ui.components.ButtonSize
 import com.example.feet.ui.components.ButtonVariant
+import com.example.feet.ui.components.GlassDialogBox
 import com.example.feet.ui.components.LiquidGlassButton
 import com.example.feet.ui.components.TranslucentBox
+import com.example.feet.ui.components.glassTextFieldColors
 import com.example.feet.ui.viewmodels.SharedViewModel
-
 @Composable
 fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
     val workouts by viewModel.todayWorkouts.collectAsState()
     val completedWorkouts = viewModel.getCompletedWorkoutsCount()
+    val workoutHistory by viewModel.workoutHistory.collectAsState()
 
     // --- NEW MEDIA STATE ---
     val currentTrack by viewModel.currentTrack.collectAsState()
@@ -41,221 +55,176 @@ fun EnhancedWorkoutScreen(viewModel: SharedViewModel) {
     // --- END NEW STATE ---
 
     var showAddWorkoutDialog by remember { mutableStateOf(false) }
+    var showAllTimeHistoryDialog by remember { mutableStateOf(false) }
+    var editingWorkoutId by remember { mutableStateOf<Long?>(null) }
     var workoutName by remember { mutableStateOf("") }
-    var workoutDuration by remember { mutableStateOf("") }
     var workoutGoalValue by remember { mutableStateOf("") }
     var selectedGoalType by remember { mutableStateOf(SharedViewModel.GoalType.REPS) }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(16.dp)
     ) {
-        Text(
-            text = "Workouts",
-            style = MaterialTheme.typography.headlineLarge,
-            color = Color.White.copy(alpha = 0.9f),
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)
-        )
-
-        // Battery-style Progress Bar
-        TranslucentBox(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Today's Progress",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
+            NowPlayingCard(
+                artist = currentArtist,
+                track = currentTrack,
+                hasPermission = hasNotificationPermission,
+                onRequestPermission = {
+                    viewModel.requestNotificationPermission()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                WorkoutBatteryIndicator(
-                    completedWorkouts = completedWorkouts,
-                    totalWorkouts = workouts.size
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "$completedWorkouts of ${workouts.size} workouts completed",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-            }
-        }
-
-        // Add Workout Button
-        LiquidGlassButton(
-            onClick = {
-                workoutName = ""
-                workoutDuration = ""
-                workoutGoalValue = ""
-                selectedGoalType = SharedViewModel.GoalType.REPS
-                showAddWorkoutDialog = true
-            },
-            text = "Add Custom Workout",
-            modifier = Modifier.fillMaxWidth(),
-            variant = ButtonVariant.PRIMARY
-        )
-
-        // Workout List
-        Text(
-            text = "Today's Workouts",
-            style = MaterialTheme.typography.headlineSmall,
-            color = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.padding(start = 8.dp)
-        )
-
-        if (workouts.isEmpty()) {
+            // Battery-style Progress Bar
             TranslucentBox(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
+                    .height(120.dp)
             ) {
-                Box(
+                Column(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "No workouts today\nAdd your first custom workout!",
+                        text = "Today's Progress",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    WorkoutBatteryIndicator(
+                        completedWorkouts = completedWorkouts,
+                        totalWorkouts = workouts.size
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "$completedWorkouts of ${workouts.size} workouts completed",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            // Add Workout Button
+            LiquidGlassButton(
+                onClick = {
+                    workoutName = ""
+                    workoutGoalValue = ""
+                    selectedGoalType = SharedViewModel.GoalType.REPS
+                    editingWorkoutId = null
+                    showAddWorkoutDialog = true
+                },
+                text = "Add Custom Workout",
+                modifier = Modifier.fillMaxWidth(),
+                variant = ButtonVariant.PRIMARY
+            )
+
+            WorkoutHistorySection(
+                history = workoutHistory,
+                onViewAllClick = { showAllTimeHistoryDialog = true }
+            )
+
+            // Workout List
+            Text(
+                text = "Today's Workouts",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.padding(start = 8.dp)
+            )
+
+            if (workouts.isEmpty()) {
+                TranslucentBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No workouts today\nAdd your first custom workout!",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fadingEdges(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 124.dp)
+            ) {
+                items(workouts) { workout ->
+                    WorkoutItem(
+                        workout = workout,
+                        onToggleComplete = {
+                            viewModel.toggleWorkout(workout.id)
+                        },
+                        onDelete = {
+                            viewModel.deleteWorkout(workout.id)
+                        },
+                        onEdit = {
+                            workoutName = workout.name
+                            workoutGoalValue = workout.goalValue.toString()
+                            selectedGoalType = workout.goalType
+                            editingWorkoutId = workout.id
+                            showAddWorkoutDialog = true
+                        }
                     )
                 }
             }
         }
 
-        // Use weight modifier if list is not empty
-        LazyColumn(
-            modifier = Modifier.weight(if (workouts.isEmpty()) 1f else 1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(workouts) { workout ->
-                WorkoutItem(
-                    workout = workout,
-                    onToggleComplete = {
-                        viewModel.toggleWorkout(workout.id)
-                    },
-                    onDelete = {
-                        viewModel.deleteWorkout(workout.id)
-                    }
-                )
-            }
-        }
-
-        // Add a spacer to push it to the bottom if the list is empty
-        if (workouts.isEmpty()) {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-
-        // --- NOW PLAYING CARD ---
-        NowPlayingCard(
-            artist = currentArtist,
-            track = currentTrack,
-            hasPermission = hasNotificationPermission,
-            onRequestPermission = {
-                viewModel.requestNotificationPermission()
-            }
-        )
-        // --- END NOW PLAYING CARD ---
-
         // Add Custom Workout Dialog
         if (showAddWorkoutDialog) {
             AddWorkoutDialog(
+                isEdit = editingWorkoutId != null,
                 name = workoutName,
                 onNameChange = { workoutName = it },
-                duration = workoutDuration,
-                onDurationChange = { workoutDuration = it },
                 goalValue = workoutGoalValue,
                 onGoalValueChange = { workoutGoalValue = it },
                 goalType = selectedGoalType,
                 onGoalTypeChange = { selectedGoalType = it },
                 onConfirm = {
-                    val duration = workoutDuration.toIntOrNull()
                     val goalValue = workoutGoalValue.toIntOrNull() ?: 0
 
                     if (workoutName.isNotBlank() && goalValue > 0) {
-                        viewModel.addCustomWorkout(workoutName, duration, goalValue, selectedGoalType)
+                        if (editingWorkoutId != null) {
+                            viewModel.editWorkout(editingWorkoutId!!, workoutName, goalValue, selectedGoalType)
+                        } else {
+                            viewModel.addCustomWorkout(workoutName, null, goalValue, selectedGoalType)
+                        }
                         showAddWorkoutDialog = false
+                        editingWorkoutId = null
                     }
                 },
-                onDismiss = { showAddWorkoutDialog = false }
+                onDismiss = { 
+                    showAddWorkoutDialog = false
+                    editingWorkoutId = null
+                }
             )
         }
-    }
-}
 
-@Composable
-fun NowPlayingCard(
-    artist: String?,
-    track: String?,
-    hasPermission: Boolean,
-    onRequestPermission: () -> Unit
-) {
-    TranslucentBox(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-    ) {
-        if (!hasPermission) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Enable notification access to see music",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                LiquidGlassButton(
-                    onClick = onRequestPermission,
-                    text = "Enable",
-                    size = ButtonSize.SMALL,
-                    variant = ButtonVariant.PRIMARY
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Now Playing",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (!track.isNullOrBlank()) track else "No music playing",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-                if (!artist.isNullOrBlank()) {
-                    Text(
-                        text = artist,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+        // All Time History Dialog
+        if (showAllTimeHistoryDialog) {
+            AllTimeHistoryDialog(
+                history = workoutHistory,
+                onDismiss = { showAllTimeHistoryDialog = false }
+            )
         }
     }
 }
@@ -338,7 +307,8 @@ fun WorkoutBatteryIndicator(
 fun WorkoutItem(
     workout: SharedViewModel.Workout,
     onToggleComplete: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     TranslucentBox(
         modifier = Modifier.fillMaxWidth()
@@ -360,30 +330,34 @@ fun WorkoutItem(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Delete button
-                LiquidGlassButton(
-                    onClick = onDelete,
-                    text = "Delete",
-                    size = ButtonSize.SMALL,
-                    variant = ButtonVariant.SECONDARY
-                )
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Workout details (Duration optional, Goal required)
-            val durationText = workout.duration?.let { "$it min" } ?: ""
+            // Workout details (Goal required)
             val goalText = when (workout.goalType) {
                 SharedViewModel.GoalType.REPS -> "${workout.goalValue} reps"
-                SharedViewModel.GoalType.KM -> "${workout.goalValue} km"
+                SharedViewModel.GoalType.DURATION -> "${workout.goalValue} min"
             }
 
             Text(
-                text = if (durationText.isNotEmpty()) {
-                    "$durationText • $goalText"
-                } else {
-                    goalText
-                },
+                text = goalText,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White.copy(alpha = 0.7f)
             )
@@ -403,10 +377,9 @@ fun WorkoutItem(
 
 @Composable
 fun AddWorkoutDialog(
+    isEdit: Boolean = false,
     name: String,
     onNameChange: (String) -> Unit,
-    duration: String,
-    onDurationChange: (String) -> Unit,
     goalValue: String,
     onGoalValueChange: (String) -> Unit,
     goalType: SharedViewModel.GoalType,
@@ -414,170 +387,250 @@ fun AddWorkoutDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss
-    ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(20.dp)
-                )
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+    Dialog(onDismissRequest = onDismiss) {
+        GlassDialogBox {
+            Text(
+                text = if (isEdit) "Edit Workout" else "Add Custom Workout",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            TextField(
+                value = name,
+                onValueChange = onNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Workout Name") },
+                placeholder = { Text("e.g., Running, Push-ups") },
+                colors = glassTextFieldColors(),
+                shape = RoundedCornerShape(10.dp),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Goal Type",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.align(Alignment.Start)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Add Custom Workout",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Bold
+                LiquidGlassButton(
+                    onClick = { onGoalTypeChange(SharedViewModel.GoalType.REPS) },
+                    text = "Repetitions",
+                    modifier = Modifier.weight(1f),
+                    variant = if (goalType == SharedViewModel.GoalType.REPS) ButtonVariant.PRIMARY else ButtonVariant.SECONDARY
                 )
-
-                TextField(
-                    value = name,
-                    onValueChange = onNameChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Workout Name") },
-                    placeholder = { Text("e.g., Running, Push-ups") },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        focusedTextColor = Color.White.copy(alpha = 0.9f),
-                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color.White.copy(alpha = 0.9f)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    singleLine = true
+                LiquidGlassButton(
+                    onClick = { onGoalTypeChange(SharedViewModel.GoalType.DURATION) },
+                    text = "Duration (min)",
+                    modifier = Modifier.weight(1f),
+                    variant = if (goalType == SharedViewModel.GoalType.DURATION) ButtonVariant.PRIMARY else ButtonVariant.SECONDARY
                 )
-
-                TextField(
-                    value = duration,
-                    onValueChange = onDurationChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Duration (Optional)") },
-                    placeholder = { Text("Duration in minutes") },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        focusedTextColor = Color.White.copy(alpha = 0.9f),
-                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color.White.copy(alpha = 0.9f)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    singleLine = true
-                )
-
-                // Goal Type Selection
-                Text(
-                    text = "Goal Type",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Reps Button
-                    LiquidGlassButton(
-                        onClick = { onGoalTypeChange(SharedViewModel.GoalType.REPS) },
-                        text = "Repetitions",
-                        modifier = Modifier.weight(1f),
-                        variant = if (goalType == SharedViewModel.GoalType.REPS) ButtonVariant.PRIMARY else ButtonVariant.SECONDARY
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            TextField(
+                value = goalValue,
+                onValueChange = onGoalValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = {
+                    Text(
+                        when (goalType) {
+                            SharedViewModel.GoalType.REPS -> "Repetitions"
+                            SharedViewModel.GoalType.DURATION -> "Duration (min)"
+                        }
                     )
-
-                    // Distance Button
-                    LiquidGlassButton(
-                        onClick = { onGoalTypeChange(SharedViewModel.GoalType.KM) },
-                        text = "Distance (km)",
-                        modifier = Modifier.weight(1f),
-                        variant = if (goalType == SharedViewModel.GoalType.KM) ButtonVariant.PRIMARY else ButtonVariant.SECONDARY
+                },
+                placeholder = {
+                    Text(
+                        when (goalType) {
+                            SharedViewModel.GoalType.REPS -> "e.g., 50"
+                            SharedViewModel.GoalType.DURATION -> "e.g., 30"
+                        }
                     )
+                },
+                colors = glassTextFieldColors(),
+                shape = RoundedCornerShape(10.dp),
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    keyboardType = KeyboardType.Number
+                ),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LiquidGlassButton(
+                    onClick = onDismiss,
+                    text = "Cancel",
+                    modifier = Modifier.weight(1f),
+                    variant = ButtonVariant.SECONDARY
+                )
+                LiquidGlassButton(
+                    onClick = onConfirm,
+                    text = if (isEdit) "Save" else "Add",
+                    modifier = Modifier.weight(1f),
+                    enabled = name.isNotBlank() && goalValue.toIntOrNull()?.let { it > 0 } == true,
+                    variant = ButtonVariant.PRIMARY
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkoutHistorySection(
+    history: List<SharedViewModel.WorkoutDaySummary>,
+    onViewAllClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Recent Progress",
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White.copy(alpha = 0.9f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (history.isEmpty()) {
+            TranslucentBox(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "No history yet.",
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        } else {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                contentPadding = PaddingValues(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(history.takeLast(3).reversed()) { item ->
+                    WorkoutHistoryItem(item = item)
                 }
 
-                TextField(
-                    value = goalValue,
-                    onValueChange = onGoalValueChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = {
-                        Text(
-                            when (goalType) {
-                                SharedViewModel.GoalType.REPS -> "Repetitions"
-                                SharedViewModel.GoalType.KM -> "Distance (km)"
-                            }
-                        )
-                    },
-                    placeholder = {
-                        Text(
-                            when (goalType) {
-                                SharedViewModel.GoalType.REPS -> "e.g., 50"
-                                SharedViewModel.GoalType.KM -> "e.g., 5"
-                            }
-                        )
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                        focusedTextColor = Color.White.copy(alpha = 0.9f),
-                        unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                        focusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
-                        focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color.White.copy(alpha = 0.9f)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    singleLine = true
-                )
-
-                // Action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    LiquidGlassButton(
-                        onClick = onDismiss,
-                        text = "Cancel",
-                        modifier = Modifier.weight(1f),
-                        variant = ButtonVariant.SECONDARY
-                    )
-
-                    LiquidGlassButton(
-                        onClick = onConfirm,
-                        text = "Add Workout",
-                        modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank() && goalValue.toIntOrNull()?.let { it > 0 } == true,
-                        variant = ButtonVariant.PRIMARY
-                    )
+                item {
+                    // History Button
+                    TranslucentBox(
+                        modifier = Modifier
+                            .height(100.dp)
+                            .padding(start = 4.dp)
+                            .clickable { onViewAllClick() }
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "History",
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun WorkoutHistoryItem(item: SharedViewModel.WorkoutDaySummary) {
+    TranslucentBox(
+        modifier = Modifier.width(100.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "${item.completionPercentage}%",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.9f)
+            )
+            Text(
+                text = "completed",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = item.date.substring(5),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+fun AllTimeHistoryDialog(
+    history: List<SharedViewModel.WorkoutDaySummary>,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        GlassDialogBox {
+            Text(
+                text = "All-Time History",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (history.isEmpty()) {
+                Text(
+                    text = "No history available.",
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(history.reversed()) { item ->
+                        TranslucentBox(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = item.date,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
+                                Text(
+                                    text = "${item.completionPercentage}% completed",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            LiquidGlassButton(
+                onClick = onDismiss,
+                text = "Close",
+                modifier = Modifier.fillMaxWidth(),
+                variant = ButtonVariant.SECONDARY
+            )
         }
     }
 }

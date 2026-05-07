@@ -34,6 +34,7 @@ fun LiquidGlassCard(
     content: @Composable () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "glass_animation")
+    val accent = LocalGlassAccentColors.current
 
     // Shimmer animation
     val shimmerOffset by infiniteTransition.animateFloat(
@@ -110,15 +111,15 @@ fun LiquidGlassCard(
                     brush = Brush.verticalGradient(
                         colors = when (glassLevel) {
                             GlassLevel.LIGHT -> listOf(
-                                LiquidGlassColors.GlassLight.copy(alpha = 0.3f),
+                                accent.tint.copy(alpha = 0.18f),
                                 LiquidGlassColors.GlassLight.copy(alpha = 0.1f)
                             )
                             GlassLevel.MEDIUM -> listOf(
-                                LiquidGlassColors.GlassMedium.copy(alpha = 0.4f),
+                                accent.tint.copy(alpha = 0.22f),
                                 LiquidGlassColors.GlassMedium.copy(alpha = 0.2f)
                             )
                             GlassLevel.HEAVY -> listOf(
-                                LiquidGlassColors.GlassHeavy.copy(alpha = 0.5f),
+                                accent.tint.copy(alpha = 0.26f),
                                 LiquidGlassColors.GlassHeavy.copy(alpha = 0.3f)
                             )
                         }
@@ -131,9 +132,9 @@ fun LiquidGlassCard(
                             width = 1.5.dp,
                             brush = Brush.linearGradient(
                                 colors = listOf(
-                                    LiquidGlassColors.BorderLight.copy(alpha = glowIntensity),
+                                    accent.border.copy(alpha = glowIntensity),
                                     LiquidGlassColors.BorderMedium.copy(alpha = glowIntensity * 0.7f),
-                                    LiquidGlassColors.BorderHeavy.copy(alpha = glowIntensity)
+                                    accent.border.copy(alpha = glowIntensity * 0.65f)
                                 )
                             ),
                             shape = RoundedCornerShape(20.dp)
@@ -141,7 +142,7 @@ fun LiquidGlassCard(
                     } else {
                         Modifier.border(
                             width = 1.dp,
-                            color = LiquidGlassColors.BorderLight,
+                            color = accent.border.copy(alpha = 0.45f),
                             shape = RoundedCornerShape(20.dp)
                         )
                     }

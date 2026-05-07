@@ -16,6 +16,7 @@ import com.example.feet.data.repository.FitnessRepository
 import com.example.feet.services.MediaNotificationListener
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -62,11 +63,33 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun loadTodayData() {
         val today = getTodayDate()
 
+        // Carry over workouts from the previous available day if today has none
+        val todayWorkoutsList = repository.getWorkoutsByDate(today).first()
+        if (todayWorkoutsList.isEmpty()) {
+            val allWorkouts = repository.getAllWorkouts().first()
+            if (allWorkouts.isNotEmpty()) {
+                val mostRecentDate = allWorkouts.maxByOrNull { it.date }?.date
+                if (mostRecentDate != null && mostRecentDate != today) {
+                    val recentWorkouts = allWorkouts.filter { it.date == mostRecentDate }
+                    recentWorkouts.forEach { workout ->
+                        repository.insertWorkout(
+                            date = today,
+                            name = workout.name,
+                            duration = workout.duration,
+                            goalValue = workout.goalValue,
+                            goalType = workout.goalType,
+                            completed = false
+                        )
+                    }
+                }
+            }
+        }
+
         // Load water data
         val waterRecord = repository.getWaterByDate(today)
         if (waterRecord != null) {
             _todayWater.value = waterRecord.totalMl
-            glassSizeMl = waterRecord.glassSize
+            _glassSizeMl.value = waterRecord.glassSize
         }
 
         // Load step data
@@ -80,7 +103,67 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         val prefs = repository.getPreferencesOnce()
         _dailyGoalMl.value = prefs.dailyWaterGoalMl
         _dailyStepGoal.value = prefs.dailyStepGoal
-        glassSizeMl = prefs.glassSize
+        _glassSizeMl.value = prefs.glassSize
+        _weightKg.value = prefs.weightKg
+        _heightCm.value = prefs.heightCm
+        _targetWeightKg.value = prefs.targetWeightKg
+
+        // Load Timers with background calculation
+        val savedTimers = repository.getAllTimers().first()
+        val now = System.currentTimeMillis()
+        _timers.value = savedTimers.map { timer ->
+            if (timer.isRunning) {
+                val elapsedSinceSave = now - timer.lastUpdated
+                val newRemaining = (timer.remainingMillis - elapsedSinceSave).coerceAtLeast(0L)
+                timer.copy(remainingMillis = newRemaining, isRunning = newRemaining > 0L, lastUpdated = now)
+            } else {
+                timer.copy(lastUpdated = now)
+            }
+        }
+
+        // Load Stopwatch with background calculation
+        val savedStopwatch = repository.getStopwatchOnce()
+        if (savedStopwatch != null) {
+            _stopwatchRunning.value = savedStopwatch.isRunning
+            if (savedStopwatch.isRunning) {
+                val elapsedSinceSave = now - savedStopwatch.lastUpdated
+                _stopwatchAccumulated.value = savedStopwatch.accumulatedMillis + elapsedSinceSave
+            } else {
+                _stopwatchAccumulated.value = savedStopwatch.accumulatedMillis
+            }
+        }
+
+        // Load Laps
+        _laps.value = repository.getAllLaps().first()
+        
+        startTicking()
+    }
+
+    private fun startTicking() {
+        viewModelScope.launch {
+            var lastTick = System.currentTimeMillis()
+            while (true) {
+                delay(16L)
+                val now = System.currentTimeMillis()
+                val delta = now - lastTick
+                lastTick = now
+
+                // Update Timers
+                _timers.value = _timers.value.map { timer ->
+                    if (timer.isRunning) {
+                        val remaining = (timer.remainingMillis - delta).coerceAtLeast(0L)
+                        timer.copy(remainingMillis = remaining, isRunning = remaining > 0L, lastUpdated = now)
+                    } else {
+                        timer
+                    }
+                }
+
+                // Update Stopwatch
+                if (_stopwatchRunning.value) {
+                    _stopwatchAccumulated.value += delta
+                }
+            }
+        }
     }
 
     // Water tracking
@@ -89,8 +172,40 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     private val _dailyGoalMl = MutableStateFlow(4000)
     val dailyGoalMl: StateFlow<Int> = _dailyGoalMl
 
-    var glassSizeMl = 250f
-        private set
+    private val _glassSizeMl = MutableStateFlow(250f)
+    val glassSizeMl: StateFlow<Float> = _glassSizeMl
+
+    // Body metrics (BMI)
+    private val _weightKg = MutableStateFlow(0f)
+    val weightKg: StateFlow<Float> = _weightKg
+
+    private val _heightCm = MutableStateFlow(0f)
+    val heightCm: StateFlow<Float> = _heightCm
+
+    private val _targetWeightKg = MutableStateFlow(0f)
+    val targetWeightKg: StateFlow<Float> = _targetWeightKg
+
+    fun getBmi(): Float {
+        val h = _heightCm.value / 100f
+        return if (h > 0f) _weightKg.value / (h * h) else 0f
+    }
+
+    fun getBmiCategory(): String = when {
+        getBmi() <= 0f    -> ""
+        getBmi() < 18.5f  -> "Underweight"
+        getBmi() < 25f    -> "Normal"
+        getBmi() < 30f    -> "Overweight"
+        else              -> "Obese"
+    }
+
+    fun saveBodyMetrics(weightKg: Float, heightCm: Float, targetWeightKg: Float) {
+        _weightKg.value = weightKg
+        _heightCm.value = heightCm
+        _targetWeightKg.value = targetWeightKg
+        viewModelScope.launch {
+            repository.updateBodyMetrics(weightKg, heightCm, targetWeightKg)
+        }
+    }
 
     private val _todayWater = MutableStateFlow(0)
     val todayWater: StateFlow<Int> = _todayWater
@@ -100,13 +215,13 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun addGlass() {
-        _todayWater.value += glassSizeMl.toInt()
+        _todayWater.value += _glassSizeMl.value.toInt()
         saveTodayWater()
     }
 
     fun removeGlass() {
         val currentMl = _todayWater.value
-        val glassSize = glassSizeMl.toInt()
+        val glassSize = _glassSizeMl.value.toInt()
         if (currentMl >= glassSize) {
             _todayWater.value -= glassSize
         } else if (currentMl > 0) {
@@ -117,7 +232,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun saveTodayWater() {
         viewModelScope.launch {
-            repository.insertOrUpdateWater(getTodayDate(), _todayWater.value, glassSizeMl)
+            repository.insertOrUpdateWater(getTodayDate(), _todayWater.value, _glassSizeMl.value)
 
             // Notify widget to update
             WaterWidgetSynced.notifyDataChanged(getApplication())
@@ -125,7 +240,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setGlassSize(sizeMl: Float) {
-        glassSizeMl = sizeMl
+        _glassSizeMl.value = sizeMl
         viewModelScope.launch {
             repository.updateGlassSize(sizeMl)
         }
@@ -142,17 +257,17 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun getGlassSize(): Float = glassSizeMl
+    fun getGlassSize(): Float = _glassSizeMl.value
 
     fun getGlassesConsumed(): Int {
-        return if (glassSizeMl > 0) {
-            (_todayWater.value / glassSizeMl).toInt().coerceAtLeast(0)
+        return if (_glassSizeMl.value > 0) {
+            (_todayWater.value / _glassSizeMl.value).toInt().coerceAtLeast(0)
         } else 0
     }
 
     fun getGlassesGoal(): Int {
-        return if (glassSizeMl > 0) {
-            (_dailyGoalMl.value / glassSizeMl).toInt()
+        return if (_glassSizeMl.value > 0) {
+            (_dailyGoalMl.value / _glassSizeMl.value).toInt()
         } else 16
     }
 
@@ -272,7 +387,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         val completed: Boolean = false
     )
 
-    enum class GoalType { REPS, KM }
+    enum class GoalType { REPS, DURATION }
 
     val todayWorkouts: StateFlow<List<Workout>> = repository.getWorkoutsByDate(getTodayDate())
         .map { entities ->
@@ -282,10 +397,25 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
                     name = entity.name,
                     duration = entity.duration,
                     goalValue = entity.goalValue,
-                    goalType = if (entity.goalType == "REPS") GoalType.REPS else GoalType.KM,
+                    goalType = if (entity.goalType == "REPS") GoalType.REPS else GoalType.DURATION,
                     completed = entity.completed
                 )
             }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    data class WorkoutDaySummary(val date: String, val completionPercentage: Int)
+
+    val workoutHistory: StateFlow<List<WorkoutDaySummary>> = repository.getAllWorkouts()
+        .map { workouts ->
+            workouts.groupBy { it.date }
+                .map { (date, dailyWorkouts) ->
+                    val completedCount = dailyWorkouts.count { it.completed }
+                    val totalCount = dailyWorkouts.size
+                    val percentage = if (totalCount > 0) (completedCount * 100) / totalCount else 0
+                    WorkoutDaySummary(date, percentage)
+                }
+                .sortedBy { it.date }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -305,6 +435,24 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteWorkout(workoutId: Long) {
         viewModelScope.launch {
             repository.deleteWorkout(workoutId)
+        }
+    }
+
+    fun editWorkout(id: Long, newName: String, newGoalValue: Int, newGoalType: GoalType) {
+        viewModelScope.launch {
+            val workouts = todayWorkouts.value
+            val workout = workouts.find { it.id == id } ?: return@launch
+
+            val entity = WorkoutEntity(
+                id = workout.id,
+                date = getTodayDate(),
+                name = newName,
+                duration = workout.duration,
+                goalValue = newGoalValue,
+                goalType = newGoalType.name,
+                completed = workout.completed
+            )
+            repository.updateWorkout(entity)
         }
     }
 
@@ -345,6 +493,115 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
+    }
+
+    // --- Timer & Stopwatch Logic ---
+    private val _timers = MutableStateFlow<List<TimerEntity>>(emptyList())
+    val timers: StateFlow<List<TimerEntity>> = _timers
+
+    private val _stopwatchAccumulated = MutableStateFlow(0L)
+    val stopwatchAccumulated: StateFlow<Long> = _stopwatchAccumulated
+
+    private val _stopwatchRunning = MutableStateFlow(false)
+    val stopwatchRunning: StateFlow<Boolean> = _stopwatchRunning
+
+    private val _laps = MutableStateFlow<List<LapRecordEntity>>(emptyList())
+    val laps: StateFlow<List<LapRecordEntity>> = _laps
+
+    fun addTimer(durationMillis: Long) {
+        viewModelScope.launch {
+            val newTimer = TimerEntity(
+                durationMillis = durationMillis,
+                remainingMillis = durationMillis,
+                isRunning = false
+            )
+            repository.insertTimer(newTimer)
+            // Reload from DB to get the ID
+            _timers.value = repository.getAllTimers().first()
+        }
+    }
+
+    fun deleteTimer(timerId: Long) {
+        viewModelScope.launch {
+            repository.deleteTimer(timerId)
+            _timers.value = _timers.value.filter { it.id != timerId }
+        }
+    }
+
+    fun toggleTimer(timerId: Long) {
+        val timer = _timers.value.find { it.id == timerId } ?: return
+        val newState = !timer.isRunning
+        _timers.value = _timers.value.map {
+            if (it.id == timerId) it.copy(isRunning = newState, lastUpdated = System.currentTimeMillis()) else it
+        }
+        saveTimerToDb(timerId)
+    }
+
+    fun resetTimer(timerId: Long) {
+        _timers.value = _timers.value.map {
+            if (it.id == timerId) it.copy(
+                remainingMillis = it.durationMillis,
+                isRunning = false,
+                lastUpdated = System.currentTimeMillis()
+            ) else it
+        }
+        saveTimerToDb(timerId)
+    }
+
+    fun updateTimerDuration(timerId: Long, newDuration: Long) {
+        _timers.value = _timers.value.map {
+            if (it.id == timerId) it.copy(
+                durationMillis = newDuration,
+                remainingMillis = newDuration,
+                isRunning = false,
+                lastUpdated = System.currentTimeMillis()
+            ) else it
+        }
+        saveTimerToDb(timerId)
+    }
+
+    private fun saveTimerToDb(timerId: Long) {
+        viewModelScope.launch {
+            val timer = _timers.value.find { it.id == timerId } ?: return@launch
+            repository.updateTimer(timer)
+        }
+    }
+
+    fun toggleStopwatch() {
+        val newState = !_stopwatchRunning.value
+        _stopwatchRunning.value = newState
+        saveStopwatchToDb()
+    }
+
+    fun resetStopwatch() {
+        _stopwatchRunning.value = false
+        _stopwatchAccumulated.value = 0L
+        viewModelScope.launch {
+            repository.clearLaps()
+            _laps.value = emptyList()
+            saveStopwatchToDb()
+        }
+    }
+
+    fun addLap() {
+        if (_stopwatchAccumulated.value > 0) {
+            viewModelScope.launch {
+                repository.addLap(_stopwatchAccumulated.value)
+                _laps.value = repository.getAllLaps().first()
+            }
+        }
+    }
+
+    private fun saveStopwatchToDb() {
+        viewModelScope.launch {
+            repository.updateStopwatch(
+                StopwatchEntity(
+                    accumulatedMillis = _stopwatchAccumulated.value,
+                    isRunning = _stopwatchRunning.value,
+                    lastUpdated = System.currentTimeMillis()
+                )
+            )
+        }
     }
 
     override fun onCleared() {

@@ -10,9 +10,13 @@ import androidx.room.RoomDatabase
         WaterRecord::class,
         StepRecord::class,
         WorkoutEntity::class,
-        UserPreferences::class
+        UserPreferences::class,
+        RunRecordEntity::class,
+        TimerEntity::class,
+        StopwatchEntity::class,
+        LapRecordEntity::class
     ],
-    version = 1,
+    version = 4,
     exportSchema = false
 )
 abstract class FitnessDatabase : RoomDatabase() {
@@ -21,6 +25,9 @@ abstract class FitnessDatabase : RoomDatabase() {
     abstract fun stepDao(): StepDao
     abstract fun workoutDao(): WorkoutDao
     abstract fun preferencesDao(): PreferencesDao
+    abstract fun runDao(): RunDao
+    abstract fun timerDao(): TimerDao
+    abstract fun stopwatchDao(): StopwatchDao
 
     companion object {
         @Volatile

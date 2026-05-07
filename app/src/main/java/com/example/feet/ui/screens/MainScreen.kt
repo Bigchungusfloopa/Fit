@@ -1,85 +1,130 @@
 package com.example.feet.ui.screens
 
-import android.os.Build // <-- ADDED THIS IMPORT
+import android.content.Context
+import android.os.Build
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.toArgb
+import com.example.feet.R
 import com.example.feet.ui.components.*
 import com.example.feet.ui.theme.LiquidGlassColors
 import com.example.feet.ui.theme.LiquidGradients
 import com.example.feet.ui.viewmodels.SharedViewModel
 import com.example.feet.ui.screens.EnhancedWaterScreen
-// Import the actual screens you provided
 import com.example.feet.ui.screens.StepsScreen
 import com.example.feet.ui.screens.EnhancedWorkoutScreen
 import kotlin.math.cos
 import kotlin.math.sin
 
-// --- EMOJI REMOVED ---
-// Navigation items with liquid glass icons
+enum class BackgroundStyle { ANIMATED, BLACK }
+
+private const val DefaultGlassBorderAccent = 0xFFFFFFFF.toInt()
+private const val DefaultGlassTintAccent = 0xFFFFFFFF.toInt()
+
 sealed class Screen(val route: String, val title: String) {
     object Water : Screen("water", "Hydration")
-    object Steps : Screen("steps", "Steps")
+    object Steps : Screen("steps", "Feet")
+    object Time : Screen("time", "Time")
     object Workout : Screen("workout", "Workout")
 }
 
 @Composable
 fun MainScreen(viewModel: SharedViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf(Screen.Water, Screen.Steps, Screen.Workout)
+    val tabs = listOf(Screen.Water, Screen.Steps, Screen.Time, Screen.Workout)
+    var showSettings by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-        //.background(LiquidGradients.oceanGradient)
-    ) {
-
-        // --- UPDATED BACKGROUND ---
-        // Checks if the phone is Android 13 (SDK 33) or higher
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ColorBendsBackground(
-                // Use bright RGB/rainbow colors instead:
-                colors = listOf(
-                    Color.Red,
-                    Color(0xFFFF7F00), // Orange
-                    Color.Yellow,
-                    Color.Green,
-                    Color.Blue,
-                    Color(0xFF8B00FF)  // Violet
-                ),
-                scale = 1.0f,
-                speed = 0.3f,
-                warpStrength = 1.0f,
-                mouseInfluence = 0.8f
+    // ── Persist background style across process kills ──────────────────────────
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    var backgroundStyle by remember {
+        mutableStateOf(
+            BackgroundStyle.valueOf(
+                prefs.getString("background_style", BackgroundStyle.ANIMATED.name)
+                    ?: BackgroundStyle.ANIMATED.name
             )
-        } else {
-            // Fallback for older phones (Android 12 and below)
-            // This will show your original liquid background
-            LiquidBackground()
+        )
+    }
+    var glassBorderAccent by remember {
+        mutableStateOf(Color(prefs.getInt("glass_border_accent", DefaultGlassBorderAccent)))
+    }
+    var glassTintAccent by remember {
+        mutableStateOf(Color(prefs.getInt("glass_tint_accent", DefaultGlassTintAccent)))
+    }
+    LaunchedEffect(backgroundStyle) {
+        prefs.edit().putString("background_style", backgroundStyle.name).apply()
+    }
+    LaunchedEffect(glassBorderAccent) {
+        prefs.edit().putInt("glass_border_accent", glassBorderAccent.toArgb()).apply()
+    }
+    LaunchedEffect(glassTintAccent) {
+        prefs.edit().putInt("glass_tint_accent", glassTintAccent.toArgb()).apply()
+    }
+
+    CompositionLocalProvider(
+        LocalGlassAccentColors provides GlassAccentColors(
+            border = glassBorderAccent,
+            tint = glassTintAccent
+        )
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+
+        // ── Background ─────────────────────────────────────────────────────
+        when (backgroundStyle) {
+            BackgroundStyle.BLACK -> Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black)
+            )
+            BackgroundStyle.ANIMATED -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ColorBendsBackground(
+                        colors = listOf(
+                            Color.Red,
+                            Color(0xFFFF7F00),
+                            Color.Yellow,
+                            Color.Green,
+                            Color.Blue,
+                            Color(0xFF8B00FF)
+                        ),
+                        scale = 1.0f,
+                        speed = 0.3f,
+                        warpStrength = 1.0f,
+                        mouseInfluence = 0.8f
+                    )
+                } else {
+                    LiquidBackground()
+                }
+            }
         }
 
-        // Note: I've commented out the orbs, as the new shader
-        // background is very detailed. You can re-enable if you like.
-        // FloatingGlassOrbs()
-        // --- END OF UPDATE ---
-
-
+        // ── Main content ────────────────────────────────────────────────────
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
@@ -95,7 +140,7 @@ fun MainScreen(viewModel: SharedViewModel) {
                 targetState = selectedTab,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(top = paddingValues.calculateTopPadding()),
                 transitionSpec = {
                     if (targetState > initialState) {
                         slideInHorizontally(
@@ -121,13 +166,103 @@ fun MainScreen(viewModel: SharedViewModel) {
             ) { targetTab ->
                 when (targetTab) {
                     0 -> EnhancedWaterScreen(viewModel)
-                    // Updated to call the correct function from StepsScreen.kt
                     1 -> StepsScreen(viewModel)
-                    // Updated to call the correct function from WorkoutScreen.kt
-                    2 -> EnhancedWorkoutScreen(viewModel)
+                    2 -> TimeScreen(viewModel)
+                    3 -> EnhancedWorkoutScreen(viewModel)
                 }
             }
         }
+
+        // ── Settings icon button (top-right) ────────────────────────────────
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(end = 12.dp, top = 4.dp)
+        ) {
+            val glassShape = RoundedCornerShape(12.dp)
+            val accent = LocalGlassAccentColors.current
+            IconButton(
+                onClick = { showSettings = true },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(glassShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.18f),
+                                accent.tint.copy(alpha = 0.08f)
+                            )
+                        )
+                    )
+                    .background(Color(0xFF0A0A0F).copy(alpha = 0.65f))
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                accent.border.copy(alpha = 0.45f),
+                                Color.White.copy(alpha = 0.10f)
+                            ),
+                            start = Offset(0f, 0f),
+                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                        ),
+                        shape = glassShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White.copy(alpha = 0.90f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // ── Settings screen slide-in ─────────────────────────────────────────
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(350, easing = FastOutSlowInEasing)
+            ) + fadeIn(tween(350)),
+            exit = slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            ) + fadeOut(tween(300))
+        ) {
+            // Overlay the same background so settings screen feels consistent
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (backgroundStyle) {
+                    BackgroundStyle.BLACK -> Box(
+                        modifier = Modifier.fillMaxSize().background(Color.Black)
+                    )
+                    BackgroundStyle.ANIMATED -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            ColorBendsBackground(
+                                colors = listOf(
+                                    Color.Red, Color(0xFFFF7F00), Color.Yellow,
+                                    Color.Green, Color.Blue, Color(0xFF8B00FF)
+                                ),
+                                scale = 1.0f, speed = 0.3f,
+                                warpStrength = 1.0f, mouseInfluence = 0.8f
+                            )
+                        } else {
+                            LiquidBackground()
+                        }
+                    }
+                }
+                SettingsScreen(
+                    backgroundStyle = backgroundStyle,
+                    onBackgroundStyleChange = { backgroundStyle = it },
+                    glassBorderAccent = glassBorderAccent,
+                    onGlassBorderAccentChange = { glassBorderAccent = it },
+                    glassTintAccent = glassTintAccent,
+                    onGlassTintAccentChange = { glassTintAccent = it },
+                    onDismiss = { showSettings = false }
+                )
+            }
+        }
+    }
     }
 }
 
@@ -168,7 +303,6 @@ fun DrawScope.drawLiquidWaves(wave1Offset: Float, wave2Offset: Float) {
     val width = size.width
     val height = size.height
 
-    // First wave layer
     val wavePath1 = Path().apply {
         moveTo(0f, height * 0.3f)
         for (x in 0..width.toInt() step 5) {
@@ -192,7 +326,6 @@ fun DrawScope.drawLiquidWaves(wave1Offset: Float, wave2Offset: Float) {
         )
     )
 
-    // Second wave layer
     val wavePath2 = Path().apply {
         moveTo(0f, height * 0.4f)
         for (x in 0..width.toInt() step 5) {
@@ -221,41 +354,29 @@ fun DrawScope.drawLiquidWaves(wave1Offset: Float, wave2Offset: Float) {
 fun FloatingGlassOrbs() {
     val infiniteTransition = rememberInfiniteTransition(label = "orbs")
 
-    // Multiple floating orbs with different animations
     val orb1Y by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 20f,
+        initialValue = 0f, targetValue = 20f,
         animationSpec = infiniteRepeatable(
             animation = tween(3000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
-        ),
-        label = "orb1_y"
+        ), label = "orb1_y"
     )
-
     val orb2Y by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = -25f,
+        initialValue = 0f, targetValue = -25f,
         animationSpec = infiniteRepeatable(
             animation = tween(3500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
-        ),
-        label = "orb2_y"
+        ), label = "orb2_y"
     )
-
     val orb3Y by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 30f,
+        initialValue = 0f, targetValue = 30f,
         animationSpec = infiniteRepeatable(
             animation = tween(4000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
-        ),
-        label = "orb3_y"
+        ), label = "orb3_y"
     )
 
-    Canvas(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Orb 1 - Top left
+    Canvas(modifier = Modifier.fillMaxSize()) {
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -267,8 +388,6 @@ fun FloatingGlassOrbs() {
             radius = 100f,
             center = Offset(100f, 200f + orb1Y)
         )
-
-        // Orb 2 - Top right
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -280,8 +399,6 @@ fun FloatingGlassOrbs() {
             radius = 80f,
             center = Offset(size.width - 120f, 250f + orb2Y)
         )
-
-        // Orb 3 - Bottom center
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -296,29 +413,52 @@ fun FloatingGlassOrbs() {
     }
 }
 
+// ── Bottom navigation bar ──────────────────────────────────────────────────────
 @Composable
 fun LiquidGlassNavigationBar(
     selectedTab: Int,
     tabs: List<Screen>,
     onTabSelected: (Int) -> Unit
 ) {
-    // Using the existing LiquidGlassCard component with available parameters
+    val glassShape = RoundedCornerShape(50)
+    val accent = LocalGlassAccentColors.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .height(72.dp)
-            // --- CHANGE HERE ---
+            .padding(horizontal = 28.dp, vertical = 12.dp)
+            .height(64.dp)
+            .clip(glassShape)
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color.Black.copy(alpha = 0.5f), // Darker "blackish" gradient
-                        Color.Black.copy(alpha = 0.3f)
+                        Color.White.copy(alpha = 0.12f),
+                        accent.tint.copy(alpha = 0.20f)
                     )
-                ),
-                shape = RoundedCornerShape(20.dp)
+                )
             )
-        // --- END CHANGE ---
+            .background(Color(0xFF0A0A0F).copy(alpha = 0.65f))
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        accent.border.copy(alpha = 0.24f),
+                        Color.White.copy(alpha = 0.05f),
+                        accent.border.copy(alpha = 0.035f)
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                ),
+                shape = glassShape
+            )
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.05f), Color.Transparent),
+                        endY = size.height * 0.4f
+                    )
+                )
+            }
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -336,7 +476,6 @@ fun LiquidGlassNavigationBar(
     }
 }
 
-// --- UPDATED NAVIGATION ITEM ---
 @Composable
 fun NavigationItem(
     screen: Screen,
@@ -344,7 +483,7 @@ fun NavigationItem(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.1f else 1f,
+        targetValue = if (isSelected) 1.08f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -352,29 +491,80 @@ fun NavigationItem(
         label = "nav_scale"
     )
 
-    // --- CHANGE HERE ---
-    // Toned-down colors for readability
-    val color = if (isSelected) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.6f)
-    // --- END CHANGE ---
+    val color = if (isSelected) Color.White.copy(alpha = 0.95f) else Color.White.copy(alpha = 0.50f)
+    val accent = LocalGlassAccentColors.current
 
-    Column(
+    Box(
         modifier = Modifier
+            .size(width = 54.dp, height = 44.dp)
             .scale(scale)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .clip(RoundedCornerShape(50))
+            .background(if (isSelected) accent.tint.copy(alpha = 0.16f) else Color.Transparent)
+            .border(
+                width = if (isSelected) 1.dp else 0.dp,
+                color = if (isSelected) accent.border.copy(alpha = 0.35f) else Color.Transparent,
+                shape = RoundedCornerShape(50)
+            )
+            .bouncyClickable(onClick = onClick)
+            .padding(10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = screen.title, // Only show the title
-            fontSize = 14.sp,
+        NavIcon(
+            screen = screen,
             color = color,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier.padding(vertical = 8.dp) // Add some padding
+            modifier = Modifier.size(24.dp)
         )
     }
 }
 
-//
-// --- Placeholder functions removed ---
-//
+@Composable
+private fun NavIcon(
+    screen: Screen,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    if (screen == Screen.Steps) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            contentDescription = screen.title,
+            colorFilter = ColorFilter.tint(color),
+            modifier = modifier.scale(1.4f)
+        )
+        return
+    }
+
+    Canvas(modifier = modifier) {
+        when (screen) {
+            Screen.Water -> drawWaterIcon(color)
+            Screen.Time -> drawTimeIcon(color)
+            Screen.Workout -> drawWorkoutIcon(color)
+            Screen.Steps -> Unit
+        }
+    }
+}
+
+private fun DrawScope.drawWaterIcon(color: Color) {
+    val path = Path().apply {
+        moveTo(size.width * 0.50f, size.height * 0.05f)
+        cubicTo(size.width * 0.22f, size.height * 0.34f, size.width * 0.14f, size.height * 0.50f, size.width * 0.14f, size.height * 0.67f)
+        cubicTo(size.width * 0.14f, size.height * 0.88f, size.width * 0.30f, size.height * 0.98f, size.width * 0.50f, size.height * 0.98f)
+        cubicTo(size.width * 0.70f, size.height * 0.98f, size.width * 0.86f, size.height * 0.88f, size.width * 0.86f, size.height * 0.67f)
+        cubicTo(size.width * 0.86f, size.height * 0.50f, size.width * 0.78f, size.height * 0.34f, size.width * 0.50f, size.height * 0.05f)
+        close()
+    }
+    drawPath(path = path, color = color)
+}
+
+private fun DrawScope.drawTimeIcon(color: Color) {
+    val stroke = Stroke(width = 2.4.dp.toPx())
+    drawCircle(color = color, radius = size.minDimension * 0.42f, center = center, style = stroke)
+    drawLine(color = color, start = center, end = Offset(center.x, size.height * 0.28f), strokeWidth = 2.4.dp.toPx())
+    drawLine(color = color, start = center, end = Offset(size.width * 0.67f, size.height * 0.58f), strokeWidth = 2.4.dp.toPx())
+}
+
+private fun DrawScope.drawWorkoutIcon(color: Color) {
+    val strokeWidth = 3.dp.toPx()
+    drawLine(color = color, start = Offset(size.width * 0.24f, size.height * 0.50f), end = Offset(size.width * 0.76f, size.height * 0.50f), strokeWidth = strokeWidth)
+    drawRoundRect(color = color, topLeft = Offset(size.width * 0.06f, size.height * 0.34f), size = Size(size.width * 0.16f, size.height * 0.32f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+    drawRoundRect(color = color, topLeft = Offset(size.width * 0.78f, size.height * 0.34f), size = Size(size.width * 0.16f, size.height * 0.32f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+}

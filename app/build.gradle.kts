@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+    alias(libs.plugins.secrets.gradle.plugin)
 }
 
 android {
@@ -90,6 +91,11 @@ dependencies {
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
 
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
+    // Google Maps + Location for running feature
+    implementation("com.google.android.gms:play-services-maps:19.0.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.maps.android:maps-compose:4.3.3")
 
     // Testing
     testImplementation(libs.junit)

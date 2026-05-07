@@ -15,9 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border // Make sure this import is here
+import androidx.compose.foundation.border
 import androidx.compose.ui.Modifier
-// import androidx.compose.ui.draw.blur // This import is no longer needed
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.geometry.Offset
@@ -27,11 +26,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog // Import the standard Dialog
-import com.example.feet.ui.components.* // Assuming LiquidGlassHeader and others are here
+import androidx.compose.ui.window.Dialog
+import com.example.feet.ui.components.*
 import com.example.feet.ui.theme.LiquidGlassColors
 import com.example.feet.ui.viewmodels.SharedViewModel
 import kotlin.math.sin
+
 
 
 @Composable
@@ -40,7 +40,10 @@ fun EnhancedWaterScreen(viewModel: SharedViewModel) {
     val progress = viewModel.getWaterProgress()
     val glassesConsumed = viewModel.getGlassesConsumed()
     val glassesGoal = viewModel.getGlassesGoal()
-    val glassSize by remember { derivedStateOf { viewModel.getGlassSize() } }
+    val glassSize by viewModel.glassSizeMl.collectAsState()
+    val weightKg by viewModel.weightKg.collectAsState()
+    val heightCm by viewModel.heightCm.collectAsState()
+    val targetWeightKg by viewModel.targetWeightKg.collectAsState()
     val waterHistory by viewModel.waterHistory.collectAsState()
 
     // --- NEW STATE ---
@@ -56,19 +59,11 @@ fun EnhancedWaterScreen(viewModel: SharedViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally // Added for the header
     ) {
-        // --- 1. HEADER UPDATED ---
-        Text(
-            text = "Hydration Tracker",
-            style = MaterialTheme.typography.headlineLarge,
-            color = Color.White.copy(alpha = 0.9f),
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 16.dp) // Added padding
-        )
-        // --- END HEADER UPDATE ---
+
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -276,183 +271,131 @@ fun EnhancedWaterScreen(viewModel: SharedViewModel) {
 
         // --- NEW SCROLLABLE BOX ADDED ---
         WaterHistorySection(history = waterHistory)
-        // --- END ADDED ---
+
+        // ── BMI & Weight Goal Card ───────────────────────────────────────────
+        BmiCard(
+            savedWeightKg = weightKg,
+            savedHeightCm = heightCm,
+            savedTargetKg = targetWeightKg,
+            bmi = viewModel.getBmi(),
+            bmiCategory = viewModel.getBmiCategory(),
+            onSave = { w, h, t -> viewModel.saveBodyMetrics(w, h, t) }
+        )
 
     } // End of main Column
 
-    // --- UPDATED GLASS SIZE DIALOG ---
     if (showGlassSizeDialog) {
-        // Use the standard Compose Dialog
-        Dialog(
-            onDismissRequest = { showGlassSizeDialog = false }
-        ) {
-            // Apply the "frosted black" style with higher opacity
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.6f)) // More opaque
-                    // --- BLUR REMOVED HERE ---
-                    .border(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(20.dp)
+        Dialog(onDismissRequest = { showGlassSizeDialog = false }) {
+            GlassDialogBox {
+                Text(
+                    text = "Set Glass Size",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextField(
+                    value = customGlassSize,
+                    onValueChange = { customGlassSize = it },
+                    label = { Text("Size in ml") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = glassTextFieldColors(),
+                    shape = RoundedCornerShape(10.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number
                     )
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Set Glass Size",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontWeight = FontWeight.Bold
+                    PresetButton("200", { customGlassSize = "200" }, modifier = Modifier.weight(1f))
+                    PresetButton("250", { customGlassSize = "250" }, modifier = Modifier.weight(1f))
+                    PresetButton("350", { customGlassSize = "350" }, modifier = Modifier.weight(1f))
+                    PresetButton("500", { customGlassSize = "500" }, modifier = Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    LiquidGlassButton(
+                        onClick = { showGlassSizeDialog = false },
+                        text = "Cancel",
+                        variant = ButtonVariant.SECONDARY,
+                        modifier = Modifier.weight(1f)
                     )
-
-                    TextField(
-                        value = customGlassSize,
-                        onValueChange = { customGlassSize = it },
-                        label = { Text("Size in ml") },
-                        modifier = Modifier.fillMaxWidth(),
-                        // Text field colors to match the dark theme
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                            unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                            focusedTextColor = Color.White.copy(alpha = 0.9f),
-                            unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                            focusedLabelColor = Color.White.copy(alpha = 0.7f),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                            focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                            unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = Color.White.copy(alpha = 0.9f)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            keyboardType = KeyboardType.Number
-                        )
+                    LiquidGlassButton(
+                        onClick = {
+                            val newSize = customGlassSize.toFloatOrNull() ?: 250f
+                            if (newSize > 0) viewModel.setGlassSize(newSize)
+                            showGlassSizeDialog = false
+                        },
+                        text = "Save",
+                        variant = ButtonVariant.PRIMARY,
+                        modifier = Modifier.weight(1f)
                     )
-
-                    // Quick preset buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        PresetButton("200", { customGlassSize = "200" }, modifier = Modifier.weight(1f))
-                        PresetButton("250", { customGlassSize = "250" }, modifier = Modifier.weight(1f))
-                        PresetButton("350", { customGlassSize = "350" }, modifier = Modifier.weight(1f))
-                        PresetButton("500", { customGlassSize = "500" }, modifier = Modifier.weight(1f))
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        LiquidGlassButton(
-                            onClick = { showGlassSizeDialog = false },
-                            text = "Cancel",
-                            variant = ButtonVariant.SECONDARY,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        LiquidGlassButton(
-                            onClick = {
-                                val newSize = customGlassSize.toFloatOrNull() ?: 250f
-                                if (newSize > 0) {
-                                    viewModel.setGlassSize(newSize)
-                                }
-                                showGlassSizeDialog = false
-                            },
-                            text = "Save",
-                            variant = ButtonVariant.PRIMARY,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
             }
         }
     }
-    // --- END OF DIALOG UPDATE ---
 
-    // --- NEW DIALOG FOR GOAL ---
+
     if (showGoalDialog) {
-        Dialog(
-            onDismissRequest = { showGoalDialog = false }
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .border(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(20.dp)
+        Dialog(onDismissRequest = { showGoalDialog = false }) {
+            GlassDialogBox {
+                Text(
+                    text = "Set Daily Goal",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                TextField(
+                    value = customGoalLiters,
+                    onValueChange = { customGoalLiters = it },
+                    label = { Text("Goal in Liters") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = glassTextFieldColors(),
+                    shape = RoundedCornerShape(10.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number
                     )
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "Set Daily Goal",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontWeight = FontWeight.Bold
+                    LiquidGlassButton(
+                        onClick = { showGoalDialog = false },
+                        text = "Cancel",
+                        variant = ButtonVariant.SECONDARY,
+                        modifier = Modifier.weight(1f)
                     )
-
-                    TextField(
-                        value = customGoalLiters,
-                        onValueChange = { customGoalLiters = it },
-                        label = { Text("Goal in Liters") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                            unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                            focusedTextColor = Color.White.copy(alpha = 0.9f),
-                            unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                            focusedLabelColor = Color.White.copy(alpha = 0.7f),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                            focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                            unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = Color.White.copy(alpha = 0.9f)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            keyboardType = KeyboardType.Number
-                        )
+                    LiquidGlassButton(
+                        onClick = {
+                            val newGoal = customGoalLiters.toFloatOrNull() ?: 4f
+                            if (newGoal > 0) viewModel.setDailyGoal(newGoal)
+                            showGoalDialog = false
+                        },
+                        text = "Save",
+                        variant = ButtonVariant.PRIMARY,
+                        modifier = Modifier.weight(1f)
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        LiquidGlassButton(
-                            onClick = { showGoalDialog = false },
-                            text = "Cancel",
-                            variant = ButtonVariant.SECONDARY,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        LiquidGlassButton(
-                            onClick = {
-                                val newGoal = customGoalLiters.toFloatOrNull() ?: 4f
-                                if (newGoal > 0) {
-                                    viewModel.setDailyGoal(newGoal)
-                                }
-                                showGoalDialog = false
-                            },
-                            text = "Save",
-                            variant = ButtonVariant.PRIMARY,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
             }
         }
     }
-    // --- END NEW DIALOG ---
 }
+
 
 @Composable
 fun LiquidWaterFill(
@@ -547,7 +490,7 @@ fun PresetButton(
             .fillMaxWidth() // Make it fill the weight from the Row
             .clip(RoundedCornerShape(12.dp))
             .background(color = Color.Black.copy(alpha = 0.15f)) // Use secondary variant alpha
-            .clickable(onClick = onClick)
+            .bouncyClickable(onClick = onClick)
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     )
@@ -629,4 +572,155 @@ fun HistoryItem(item: SharedViewModel.WaterData) {
         }
     }
 }
-// --- END OF NEW COMPOSABLES ---
+
+// ── BMI & Weight Goal Card ────────────────────────────────────────────────────
+@Composable
+fun BmiCard(
+    savedWeightKg: Float,
+    savedHeightCm: Float,
+    savedTargetKg: Float,
+    bmi: Float,
+    bmiCategory: String,
+    onSave: (weight: Float, height: Float, target: Float) -> Unit
+) {
+    var weight by remember(savedWeightKg) { mutableStateOf(if (savedWeightKg > 0f) savedWeightKg.toString() else "") }
+    var height by remember(savedHeightCm) { mutableStateOf(if (savedHeightCm > 0f) savedHeightCm.toString() else "") }
+    var target by remember(savedTargetKg) { mutableStateOf(if (savedTargetKg > 0f) savedTargetKg.toString() else "") }
+
+    // Recompute live BMI from local inputs
+    val liveBmi: Float = run {
+        val w = weight.toFloatOrNull() ?: 0f
+        val h = (height.toFloatOrNull() ?: 0f) / 100f
+        if (h > 0f) w / (h * h) else 0f
+    }
+    val liveCategory = when {
+        liveBmi <= 0f   -> ""
+        liveBmi < 18.5f -> "Underweight"
+        liveBmi < 25f   -> "Normal"
+        liveBmi < 30f   -> "Overweight"
+        else            -> "Obese"
+    }
+    val categoryColor = when (liveCategory) {
+        "Normal"      -> Color(0xFF00C853)
+        "Underweight" -> Color(0xFF40C4FF)
+        "Overweight"  -> Color(0xFFFFAB00)
+        "Obese"       -> Color(0xFFFF5252)
+        else          -> Color.White.copy(alpha = 0.4f)
+    }
+
+    TranslucentBox(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "BMI & Weight",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Bold
+            )
+
+            // ── Inputs ──────────────────────────────────────────────────────────
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextField(
+                    value = weight,
+                    onValueChange = { weight = it },
+                    label = { Text("Weight (kg)") },
+                    modifier = Modifier.weight(1f),
+                    colors = glassTextFieldColors(),
+                    shape = RoundedCornerShape(10.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+                TextField(
+                    value = height,
+                    onValueChange = { height = it },
+                    label = { Text("Height (cm)") },
+                    modifier = Modifier.weight(1f),
+                    colors = glassTextFieldColors(),
+                    shape = RoundedCornerShape(10.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+            }
+
+            TextField(
+                value = target,
+                onValueChange = { target = it },
+                label = { Text("Target Weight (kg)") },
+                modifier = Modifier.fillMaxWidth(),
+                colors = glassTextFieldColors(),
+                shape = RoundedCornerShape(10.dp),
+                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Decimal),
+                singleLine = true
+            )
+
+            // ── BMI Result ──────────────────────────────────────────────────────
+            if (liveBmi > 0f) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "BMI",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.55f)
+                        )
+                        Text(
+                            text = "%.1f".format(liveBmi),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.White.copy(alpha = 0.95f),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    // Category badge
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = categoryColor.copy(alpha = 0.18f),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .border(1.dp, categoryColor.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = liveCategory,
+                            color = categoryColor,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+
+                // ── Weight-to-goal indicator ─────────────────────────────────────
+                val targetW = target.toFloatOrNull() ?: 0f
+                val currentW = weight.toFloatOrNull() ?: 0f
+                if (targetW > 0f && currentW > 0f) {
+                    val diff = currentW - targetW
+                    Text(
+                        text = when {
+                            diff > 0f  -> "%.1f kg to lose to reach goal".format(diff)
+                            diff < 0f  -> "%.1f kg to gain to reach goal".format(-diff)
+                            else       -> "🎉 Goal reached!"
+                        },
+                        color = if (diff == 0f) Color(0xFF00C853) else Color.White.copy(alpha = 0.65f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            // ── Save ────────────────────────────────────────────────────────────
+            LiquidGlassButton(
+                onClick = {
+                    val w = weight.toFloatOrNull() ?: return@LiquidGlassButton
+                    val h = height.toFloatOrNull() ?: return@LiquidGlassButton
+                    val t = target.toFloatOrNull() ?: 0f
+                    onSave(w, h, t)
+                },
+                text = "Save",
+                modifier = Modifier.fillMaxWidth(),
+                variant = ButtonVariant.PRIMARY,
+                enabled = weight.toFloatOrNull() != null && height.toFloatOrNull() != null
+            )
+        }
+    }
+}
